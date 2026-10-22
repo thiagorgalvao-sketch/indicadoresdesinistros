@@ -321,7 +321,7 @@
     #app { padding: 16px 12px 50px; }
     header.top h1 { font-size: 18px; }
     header.top p { font-size: 12px; }
-    .header-right { align-items: flex-start; width: 100%; }
+    .header-right { align-items: flex-start; width: 100%; order: -1; margin-bottom: 10px; }
     .brand-logos { gap: 10px; }
     .logo-badge { height: 24px; }
     .logo-chip .logo-badge { height: 20px; }
@@ -379,7 +379,7 @@
   <header class="top" id="liveHeader">
     <div>
       <h1>📊 Workflow de Sinistros de Transporte - Indicadores</h1>
-      <p>Indicadores da operação, com comparação entre períodos para acompanhamento durante produção assistida.</p>
+      <p>Indicadores da operação, para acompanhamento durante produção assistida.</p>
       <p class="last-update" id="lastUpdate" style="display:none;"><span class="dot"></span><span></span></p>
     </div>
     <div class="header-right">
@@ -1101,8 +1101,11 @@
       var latest = allDocs[0].data;
       if (latest.uploadedAt) {
         lastUpdateEl.style.display = "flex";
+        var uploadedDate = new Date(latest.uploadedAt);
+        var uploadedDateOnly = uploadedDate.toLocaleDateString("pt-BR");
+        var labelDiffers = latest.label && latest.label.trim() !== uploadedDateOnly;
         lastUpdateEl.querySelector("span:last-child").textContent =
-          "Última atualização: " + new Date(latest.uploadedAt).toLocaleString("pt-BR") + " (" + (latest.label || "") + ")";
+          "Última atualização: " + uploadedDate.toLocaleString("pt-BR") + (labelDiffers ? " (" + latest.label + ")" : "");
       }
       renderDashboard();
     }).catch(function (err) {
