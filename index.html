@@ -329,7 +329,7 @@
   var ANALISTA_NAO_INFORMADO = "ANALISTA NÃO INFORMADO";
   var CONTA_DE_SISTEMA = "CONTA DE SISTEMA";
   var CONTAS_DE_SISTEMA_RAW = ["tarefa.automatica", "adm"];
-  var API_REGULATORS = ["Dórica Reguladora", "L Perna", "Fox"];
+  var API_REGULATORS = ["Dórica Reguladora", "L Perna", "Fox", "Serra & Company"];
   var STATUS_NAMES = ["Aprovado", "Atrasado", "Em andamento", "Cancelado", "Rejeitado"];
   function sortRegulators(a, b) {
     if (a.label === NAO_INFORMADA) return 1;
@@ -1299,6 +1299,7 @@
         .attr("class", "axis-cat")
         .attr("y", function (d) { return y(d.label) + y.bandwidth() / 2 + 4; })
         .attr("x", -8).attr("text-anchor", "end")
+        .style("font-weight", function (d) { return API_REGULATORS.indexOf(d.label) !== -1 ? "700" : "400"; })
         .text(function (d) { return catLabel(d.label, 20); })
         .append("title").text(function (d) { return d.tooltip || (d.label + (API_REGULATORS.indexOf(d.label) !== -1 ? " — integração via API" : "")); });
     } else {
