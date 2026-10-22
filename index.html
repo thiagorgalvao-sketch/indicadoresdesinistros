@@ -228,13 +228,15 @@
   @media (max-width: 760px) { .chart-grid { grid-template-columns: 1fr; } }
   .chart-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 14px; padding: 16px 18px 10px; }
   .chart-card h3 { font-size: 13px; margin: 0 0 10px; color: var(--color-fg); font-weight: 700; }
+  .chart-card-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .chart-card svg { width: 100%; height: auto; display: block; overflow: visible; }
   .bar-label { font-size: 11px; fill: var(--color-fg); font-weight: 700; }
   .axis-label { font-size: 10px; fill: var(--color-fg-muted); }
   .axis-cat { font-size: 10.5px; fill: var(--color-fg-muted); }
   .legend-item { font-size: 11px; fill: var(--color-fg-muted); }
 
-  table.history { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+  table.history { width: 100%; min-width: 420px; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
   table.history th, table.history td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--color-border-line); }
   table.history th { color: var(--color-fg-muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; }
   table.history tr.current td { font-weight: 700; }
@@ -292,6 +294,50 @@
   .chart-card .hint-click { font-size: 10px; color: var(--color-fg-muted); font-weight: 500; margin-left: 6px; }
   .clickable-el { cursor: pointer; }
   .clickable-el:hover { opacity: .82; }
+
+  /* ---------- responsividade para celular ---------- */
+  @media (max-width: 600px) {
+    #app { padding: 16px 12px 50px; }
+    header.top h1 { font-size: 18px; }
+    header.top p { font-size: 12px; }
+    .header-right { align-items: flex-start; width: 100%; }
+    .brand-logos { gap: 10px; }
+    .logo-badge { height: 24px; }
+    .logo-chip .logo-badge { height: 20px; }
+    .header-btns { width: 100%; }
+    .header-btns .icon-btn { flex: 1; justify-content: center; }
+
+    .toolbar-row { flex-direction: column; align-items: stretch; }
+    .toolbar-left { width: 100%; flex-direction: column; align-items: stretch; gap: 10px; }
+    .filter-group, .compare-group { width: 100%; }
+    .filter-group input[type="date"] { flex: 1; min-width: 0; }
+    .compare-group select { flex: 1; min-width: 0; }
+    .toolbar-right { margin-left: 0; width: 100%; }
+    .toolbar-right button { flex: 1; }
+
+    .chart-card-head { flex-direction: column; align-items: flex-start; }
+    .seg-group { width: 100%; }
+    .seg-btn { flex: 1; font-size: 10px; padding: 8px 4px; text-align: center; }
+
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .kpi { padding: 12px 14px; gap: 8px; }
+    .kpi-icon { width: 32px; height: 32px; font-size: 14px; }
+    .kpi .value { font-size: 21px; }
+    .kpi .label { font-size: 10.5px; }
+    .kpi .delta { font-size: 10.5px; flex-wrap: wrap; }
+
+    .summary-banner, .alert-banner, .stale-banner, .active-filter-chip { font-size: 12.5px; padding: 12px 14px; }
+
+    .del-btn { padding: 9px 10px; font-size: 16px; }
+    table.history th, table.history td { padding: 8px 6px; }
+
+    .export-header .row { flex-direction: column; align-items: flex-start; }
+    .upload-row { flex-direction: column; align-items: stretch; }
+    .upload-row input[type="text"] { min-width: 0; }
+  }
+  @media (max-width: 400px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -1135,7 +1181,7 @@
     html += '</div>';
 
     html += '<div class="section-title">Analistas</div>';
-    html += '<div class="chart-card" style="margin-bottom:16px;"><div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;"><h3>ANALISTAS — VOLUME TOTAL <span class="hint-click">💡 clique para filtrar</span></h3>' +
+    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>ANALISTAS — VOLUME TOTAL <span class="hint-click">💡 clique para filtrar</span></h3>' +
       '<div style="display:flex; align-items:center; gap:10px;">' +
       '<div class="seg-group" id="analystFilterGroup">' +
       '<button type="button" class="seg-btn seg-neutral' + (analystFilter === "todos" ? " active" : "") + '" data-filter="todos">Todos os processos</button>' +
@@ -1146,7 +1192,7 @@
       '</div></div><div id="chart-analista"></div></div>';
 
     html += '<div class="section-title">Reguladoras</div>';
-    html += '<div class="chart-card" style="margin-bottom:16px;"><div style="display:flex; align-items:center; justify-content:space-between;"><h3>REGULADORAS — VOLUME TOTAL <span class="hint-click">💡 clique para filtrar</span></h3><button class="secondary" id="regToggleBtn" style="display:none; padding:5px 12px; font-size:11.5px;"></button></div><div id="chart-top"></div><div style="margin-top:10px;"><span class="pill-outline">⚡ Reguladora com integração via API (Associada)</span></div></div>';
+    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>REGULADORAS — VOLUME TOTAL <span class="hint-click">💡 clique para filtrar</span></h3><button class="secondary" id="regToggleBtn" style="display:none; padding:5px 12px; font-size:11.5px;"></button></div><div id="chart-top"></div><div style="margin-top:10px;"><span class="pill-outline">⚡ Reguladora com integração via API (Associada)</span></div></div>';
 
     html += '<div class="section-title">Composição da base</div>';
     html += '<div class="chart-grid">';
@@ -1164,7 +1210,7 @@
     // history — fica fora do PDF; aqui é só um log de uploads, não participa do corte por data
     html += '<div id="historySection">';
     html += '<div class="section-title">Histórico de uploads</div>';
-    html += '<div class="card"><table class="history"><thead><tr><th>Rótulo</th><th>Linhas</th><th>Enviado em</th><th></th></tr></thead><tbody>';
+    html += '<div class="card"><div class="table-scroll"><table class="history"><thead><tr><th>Rótulo</th><th>Linhas</th><th>Enviado em</th><th></th></tr></thead><tbody>';
     allDocs.forEach(function (d) {
       var r = d.data;
       var when = r.uploadedAt ? new Date(r.uploadedAt).toLocaleString("pt-BR") : "—";
@@ -1175,7 +1221,7 @@
         '<td class="actions">' + (d.id !== "local" ? '<button class="del-btn" data-del-id="' + d.id + '" title="Excluir este upload" aria-label="Excluir upload ' + (r.label || "") + '">🗑</button>' : '') + '</td>' +
         '</tr>';
     });
-    html += '</tbody></table></div>';
+    html += '</tbody></table></div></div>';
     html += '</div>';
 
     content.innerHTML = html;
