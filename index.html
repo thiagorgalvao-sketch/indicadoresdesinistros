@@ -276,6 +276,21 @@
   .export-header .logos img { height: 26px; }
 
   ::placeholder { color: var(--color-fg-muted); opacity: .7; }
+
+  .active-filter-chip {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--color-navy); color: #fff; border-radius: 12px;
+    padding: 10px 16px; margin-bottom: 18px; font-size: 13px;
+  }
+  .active-filter-chip strong { font-weight: 700; }
+  .active-filter-chip button {
+    background: rgba(255,255,255,.18); border: none; color: #fff; border-radius: 999px;
+    padding: 4px 11px; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  }
+  .active-filter-chip button:hover { background: rgba(255,255,255,.3); }
+  .chart-card .hint-click { font-size: 10px; color: var(--color-fg-muted); font-weight: 500; margin-left: 6px; }
+  .clickable-el { cursor: pointer; }
+  .clickable-el:hover { opacity: .82; }
 </style>
 </head>
 <body>
@@ -383,6 +398,42 @@
         return w.length ? w.charAt(0).toUpperCase() + w.slice(1) : w;
       }).join(" ");
     }).join("; ");
+  }
+
+  // --------- filtro por clique (drill-down) ---------
+  // Clicar numa barra/fatia filtra o painel inteiro para aquele recorte.
+  // activeFilter = { dim: "reg"|"analyst"|"origem"|"status"|"statusgroup", value, displayLabel }
+  var activeFilter = null;
+
+  function applyActiveFilter(rowData, regIndex, analystIndex, filter) {
+    if (!filter) return rowData;
+    return rowData.filter(function (row) {
+      if (filter.dim === "reg") return regIndex[row[3]] === filter.value;
+      if (filter.dim === "analyst") {
+        var name = analystIndex[row[5]];
+        if (filter.value === CONTA_DE_SISTEMA) return CONTAS_DE_SISTEMA_RAW.indexOf(String(name).toLowerCase()) !== -1;
+        return formatAnalystName(name) === filter.value;
+      }
+      if (filter.dim === "origem") {
+        var code = filter.value === "API" ? 0 : filter.value === "Migração Quiver" ? 1 : 2;
+        return row[2] === code;
+      }
+      if (filter.dim === "status") return STATUS_NAMES[row[1]] === filter.value;
+      if (filter.dim === "statusgroup") {
+        var isAberto = row[1] === 1 || row[1] === 2;
+        return filter.value === "Aberto" ? isAberto : !isAberto;
+      }
+      return true;
+    });
+  }
+
+  function setActiveFilter(dim, value, displayLabel) {
+    if (activeFilter && activeFilter.dim === dim && activeFilter.value === value) {
+      activeFilter = null; // clicar de novo no mesmo item remove o filtro
+    } else {
+      activeFilter = { dim: dim, value: value, displayLabel: displayLabel || value };
+    }
+    renderDashboard();
   }
 
   var fileInput = document.getElementById("fileInput");
@@ -978,13 +1029,15 @@
       ' (' + sign + pct.toFixed(1) + '%) <span style="color:var(--color-fg-muted); font-weight:500;">vs. anterior</span></div>';
   }
 
-  function buildSummary(current, previous) {
+  function buildSummary(current, previous, skipAlertStat) {
     var parts = [];
-    if (current.aberto > 0) {
-      var pctEmDiaAberto = Math.round((current.aberto - current.atrasado) / current.aberto * 100);
-      parts.push("Dos processos em aberto, " + fmt(pctEmDiaAberto) + "% estão em dia e " + fmt(100 - pctEmDiaAberto) + "% estão atrasados.");
-    } else {
-      parts.push("Nenhum processo em aberto no período.");
+    if (!skipAlertStat) {
+      if (current.aberto > 0) {
+        var pctEmDiaAberto = Math.round((current.aberto - current.atrasado) / current.aberto * 100);
+        parts.push("Dos processos em aberto, " + fmt(pctEmDiaAberto) + "% estão em dia e " + fmt(100 - pctEmDiaAberto) + "% estão atrasados.");
+      } else {
+        parts.push("Nenhum processo em aberto no período.");
+      }
     }
     if (previous && previous.atrasado !== undefined) {
       var diff = current.atrasado - previous.atrasado;
@@ -998,7 +1051,7 @@
     if (current.atrasoMedioDias !== null && current.atrasoMedioDias !== undefined) {
       parts.push("Atraso médio atual: " + current.atrasoMedioDias + " dias.");
     }
-    return parts.join(" ");
+    return parts.length ? parts.join(" ") : null;
   }
 
   function renderDashboard() {
@@ -1007,12 +1060,13 @@
     if (sourceDoc) {
       cutoffDate = dateFilter.value ? new Date(dateFilter.value + "T12:00:00") : dateFromDays(Math.max.apply(null, sourceDoc.data.rowData.map(function (r) { return r[0]; })));
       var curDays = daysSinceEpoch(cutoffDate);
-      current = computeCumulative(sourceDoc.data.rowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, curDays);
+      var effectiveRowData = applyActiveFilter(sourceDoc.data.rowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, activeFilter);
+      current = computeCumulative(effectiveRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, curDays);
 
       var mode = compareSelect.value || "1d";
       previousCutoffDate = mode === "7d" ? daysBack(cutoffDate, 7) : mode === "30d" ? monthsBack(cutoffDate, 1) : mode === "365d" ? monthsBack(cutoffDate, 12) : daysBack(cutoffDate, 1);
       var prevDays = daysSinceEpoch(previousCutoffDate);
-      previous = computeCumulative(sourceDoc.data.rowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, prevDays);
+      previous = computeCumulative(effectiveRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, prevDays);
 
       filterExplain.style.display = "block";
       filterExplain.textContent = "Mostrando sinistros com abertura até " + fmtDate(cutoffDate) +
@@ -1040,12 +1094,24 @@
       }
     }
 
-    // resumo executivo automático
-    html += '<div class="summary-banner">📌 ' + buildSummary(current, previous) + '</div>';
+    // chip do filtro de clique (drill-down) ativo
+    if (activeFilter) {
+      html += '<div class="active-filter-chip">🔎 Filtrado por: <strong>' + activeFilter.displayLabel + '</strong> ' +
+        '<button type="button" id="clearFilterBtn">✕ Limpar filtro</button></div>';
+    }
 
-    // alert banner for high atrasado rate
+    // alerta de taxa crítica de atraso — calculado antes do resumo para evitar repetir o mesmo dado
     var atrasoRate = current.aberto > 0 ? (current.atrasado / current.aberto) : 0;
-    if (current.aberto > 0 && atrasoRate >= 0.5) {
+    var showAlert = current.aberto > 0 && atrasoRate >= 0.5;
+
+    // resumo executivo automático — quando o alerta crítico já aparece, o resumo não repete
+    // o mesmo percentual, só complementa com tendência e atraso médio
+    var summaryText = buildSummary(current, previous, showAlert);
+    if (summaryText) {
+      html += '<div class="summary-banner">📌 ' + summaryText + '</div>';
+    }
+
+    if (showAlert) {
       html += '<div class="alert-banner"><div class="icon">⚠️</div><div>' +
         '<strong>' + fmt(current.atrasado) + ' processos atrasados</strong> — ' +
         (atrasoRate * 100).toFixed(0) + '% dos processos em aberto (' + fmt(current.aberto) + ') estão com prazo vencido.' +
@@ -1064,12 +1130,12 @@
     // charts
     html += '<div class="section-title">Status da operação</div>';
     html += '<div class="chart-grid">';
-    html += '<div class="chart-card"><h3>PROCESSOS POR STATUS</h3><div id="chart-status"></div></div>';
-    html += '<div class="chart-card"><h3>STATUS DETALHADO DO PROCESSO</h3><div id="chart-detalhado"></div></div>';
+    html += '<div class="chart-card"><h3>PROCESSOS POR STATUS <span class="hint-click">💡 clique para filtrar</span></h3><div id="chart-status"></div></div>';
+    html += '<div class="chart-card"><h3>STATUS DETALHADO DO PROCESSO <span class="hint-click">💡 clique para filtrar</span></h3><div id="chart-detalhado"></div></div>';
     html += '</div>';
 
     html += '<div class="section-title">Analistas</div>';
-    html += '<div class="chart-card" style="margin-bottom:16px;"><div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;"><h3>ANALISTAS — VOLUME TOTAL</h3>' +
+    html += '<div class="chart-card" style="margin-bottom:16px;"><div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;"><h3>ANALISTAS — VOLUME TOTAL <span class="hint-click">💡 clique para filtrar</span></h3>' +
       '<div style="display:flex; align-items:center; gap:10px;">' +
       '<div class="seg-group" id="analystFilterGroup">' +
       '<button type="button" class="seg-btn seg-neutral' + (analystFilter === "todos" ? " active" : "") + '" data-filter="todos">Todos os processos</button>' +
@@ -1080,12 +1146,12 @@
       '</div></div><div id="chart-analista"></div></div>';
 
     html += '<div class="section-title">Reguladoras</div>';
-    html += '<div class="chart-card" style="margin-bottom:16px;"><div style="display:flex; align-items:center; justify-content:space-between;"><h3>REGULADORAS — VOLUME TOTAL</h3><button class="secondary" id="regToggleBtn" style="display:none; padding:5px 12px; font-size:11.5px;"></button></div><div id="chart-top"></div><div style="margin-top:10px;"><span class="pill-outline">⚡ Reguladora com integração via API (Associada)</span></div></div>';
+    html += '<div class="chart-card" style="margin-bottom:16px;"><div style="display:flex; align-items:center; justify-content:space-between;"><h3>REGULADORAS — VOLUME TOTAL <span class="hint-click">💡 clique para filtrar</span></h3><button class="secondary" id="regToggleBtn" style="display:none; padding:5px 12px; font-size:11.5px;"></button></div><div id="chart-top"></div><div style="margin-top:10px;"><span class="pill-outline">⚡ Reguladora com integração via API (Associada)</span></div></div>';
 
     html += '<div class="section-title">Composição da base</div>';
     html += '<div class="chart-grid">';
-    html += '<div class="chart-card"><h3>TIPO DE REGISTRO</h3><div id="chart-tipo"></div></div>';
-    html += '<div class="chart-card"><h3>PROCESSOS VIA API (POR REGULADORA)</h3><div id="chart-api"></div></div>';
+    html += '<div class="chart-card"><h3>TIPO DE REGISTRO <span class="hint-click">💡 clique para filtrar</span></h3><div id="chart-tipo"></div></div>';
+    html += '<div class="chart-card"><h3>PROCESSOS VIA API (POR REGULADORA) <span class="hint-click">💡 clique para filtrar</span></h3><div id="chart-api"></div></div>';
     html += '</div>';
 
     // tendência — calculada por fatiamento de data, não depende de múltiplos uploads
@@ -1113,6 +1179,15 @@
     html += '</div>';
 
     content.innerHTML = html;
+    animateCounters();
+
+    var clearFilterBtn = document.getElementById("clearFilterBtn");
+    if (clearFilterBtn) {
+      clearFilterBtn.addEventListener("click", function () {
+        activeFilter = null;
+        renderDashboard();
+      });
+    }
 
     var analystFilterGroup = document.getElementById("analystFilterGroup");
     if (analystFilterGroup) {
@@ -1165,7 +1240,7 @@
       { label: "Manual", value: current.manual, color: COLORS.gray },
       { label: "API", value: current.api, color: COLORS.teal },
       { label: "Migração Quiver", value: current.quiver, color: COLORS.navy },
-    ]);
+    ], { filterDim: "origem", onClick: function (label) { setActiveFilter("origem", label, label); } });
 
     function gradient(n, c1, c2) {
       var interp = d3.interpolateRgb(c1, c2);
@@ -1179,12 +1254,12 @@
     }).sort(sortRegulators);
     var apiColors = gradient(apiEntries.length, COLORS.navy, COLORS.lightblue);
     apiEntries.forEach(function (e, i) { e.color = e.label === NAO_INFORMADA ? COLORS.amber : apiColors[i]; });
-    drawBars("#chart-api", apiEntries, { horizontal: apiEntries.length > 5 });
+    drawBars("#chart-api", apiEntries, { horizontal: apiEntries.length > 5, filterDim: "reg", onClick: function (label) { setActiveFilter("reg", label, label); } });
 
     drawDonut("#chart-status", [
       { label: "Aberto", value: current.aberto, color: COLORS.amber },
       { label: "Encerrado", value: current.encerrado, color: COLORS.green },
-    ]);
+    ], { filterDim: "statusgroup", onClick: function (label) { setActiveFilter("statusgroup", label, label); } });
 
     drawBars("#chart-detalhado", [
       { label: "Em andamento", value: current.emAndamento, color: COLORS.amber },
@@ -1192,7 +1267,7 @@
       { label: "Aprovado", value: current.aprovado, color: COLORS.green },
       { label: "Cancelado", value: current.cancelado, color: COLORS.gray },
       { label: "Rejeitado", value: current.rejeitado, color: COLORS.maroon },
-    ], { horizontal: false, groupSplit: 2, groupLabels: ["EM ABERTO", "ENCERRADO"] });
+    ], { horizontal: false, groupSplit: 2, groupLabels: ["EM ABERTO", "ENCERRADO"], filterDim: "status", onClick: function (label) { setActiveFilter("status", label, label); } });
 
     allRegulatorEntries = Object.keys(current.byRegTotal || {}).map(function (k) {
       return { label: k, value: current.byRegTotal[k] };
@@ -1242,7 +1317,7 @@
           .style("color", "var(--color-fg-muted)").style("font-size", "12px")
           .text("Esta base ainda não tem sinistros com abertura após o Go-Live (23/09/2026) — última abertura registrada: " + fmtDate(dateFromDays(Math.max.apply(null, sourceDoc.data.rowData.map(function (r) { return r[0]; })))) + ".");
       } else {
-        var series = computeTrendSeries(sourceDoc.data.rowData, sourceDoc.data.regIndex, GO_LIVE_DATE, cutoffDate);
+        var series = computeTrendSeries(effectiveRowData, sourceDoc.data.regIndex, GO_LIVE_DATE, cutoffDate);
         drawTrend("#chart-trend", series);
       }
     }
@@ -1251,7 +1326,7 @@
   function drawRegulatorChart() {
     var full = showAllRegulators;
     var shown = full ? allRegulatorEntries : allRegulatorEntries.slice(0, 10);
-    drawBars("#chart-top", shown, { horizontal: true });
+    drawBars("#chart-top", shown, { horizontal: true, filterDim: "reg", onClick: function (label) { setActiveFilter("reg", label, label); } });
     var toggleBtn = document.getElementById("regToggleBtn");
     if (toggleBtn) {
       toggleBtn.style.display = allRegulatorEntries.length > 10 ? "inline-block" : "none";
@@ -1266,7 +1341,7 @@
   function drawAnalystChart() {
     var full = showAllAnalysts;
     var shown = full ? allAnalystEntries : allAnalystEntries.slice(0, 10);
-    drawBars("#chart-analista", shown, { horizontal: true });
+    drawBars("#chart-analista", shown, { horizontal: true, filterDim: "analyst", onClick: function (label) { setActiveFilter("analyst", label, label); } });
     var toggleBtn = document.getElementById("analystToggleBtn");
     if (toggleBtn) {
       toggleBtn.style.display = allAnalystEntries.length > 10 ? "inline-block" : "none";
@@ -1279,14 +1354,35 @@
   }
 
   function kpiCard(label, curr, prev, invert, isDaysMetric, icon, iconColor) {
-    var displayVal = (curr === null || curr === undefined) ? "—" : (isDaysMetric ? curr : fmt(curr));
+    var hasVal = curr !== null && curr !== undefined;
+    var displayVal = hasVal ? (isDaysMetric ? curr : fmt(curr)) : "—";
     return '<div class="kpi">' +
       '<div class="kpi-icon" style="color:' + (iconColor || COLORS.navy) + ';">' + (icon || "📊") + '</div>' +
       '<div class="kpi-body">' +
       '<div class="label">' + label + '</div>' +
-      '<div class="value">' + displayVal + '</div>' +
+      '<div class="value"' + (hasVal ? ' data-target="' + curr + '"' : '') + '>' + (hasVal ? "0" : displayVal) + '</div>' +
       (curr === null || curr === undefined ? '<div class="delta neutral">sem atrasados no período</div>' : deltaHtml(curr, prev, invert)) +
       '</div></div>';
+  }
+
+  // conta de 0 até o valor final de cada KPI, para dar sensação de movimento ao carregar
+  function animateCounters() {
+    document.querySelectorAll(".kpi .value[data-target]").forEach(function (el) {
+      var target = parseFloat(el.getAttribute("data-target"));
+      if (isNaN(target)) return;
+      var start = null;
+      var duration = 700;
+      function step(ts) {
+        if (!start) start = ts;
+        var progress = Math.min((ts - start) / duration, 1);
+        var eased = 1 - Math.pow(1 - progress, 3);
+        var current = Math.round(target * eased);
+        el.textContent = fmt(current);
+        if (progress < 1) requestAnimationFrame(step);
+        else el.textContent = fmt(target);
+      }
+      requestAnimationFrame(step);
+    });
   }
 
   // -------- simple D3 chart helpers --------
@@ -1324,45 +1420,72 @@
     var g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
     var maxVal = d3.max(entries, function (d) { return d.value; }) || 1;
+    var clickable = !!opts.onClick;
+    function isActive(d) { return activeFilter && opts.filterDim === activeFilter.dim && d.label === activeFilter.value; }
 
     if (horizontal) {
       var y = d3.scaleBand().domain(entries.map(function (d) { return d.label; })).range([0, innerH]).padding(0.28);
       var x = d3.scaleLinear().domain([0, maxVal]).range([0, innerW]);
-      g.selectAll("rect").data(entries).enter().append("rect")
+      var rects = g.selectAll("rect").data(entries).enter().append("rect")
         .attr("y", function (d) { return y(d.label); })
         .attr("x", 0).attr("height", y.bandwidth())
-        .attr("width", function (d) { return x(d.value); })
+        .attr("width", 0)
         .attr("rx", 3)
         .attr("fill", function (d) { return d.color; })
-        .append("title").text(function (d) { return d.tooltip || (d.label + ": " + fmt(d.value)); });
+        .attr("stroke", function (d) { return isActive(d) ? "var(--color-fg)" : "none"; })
+        .attr("stroke-width", function (d) { return isActive(d) ? 2 : 0; })
+        .style("opacity", function (d) { return (activeFilter && !isActive(d) && opts.filterDim === activeFilter.dim) ? 0.4 : 1; })
+        .classed("clickable-el", clickable);
+      if (clickable) rects.on("click", function (event, d) { opts.onClick(d.label); });
+      rects.append("title").text(function (d) { return d.tooltip || (d.label + ": " + fmt(d.value)); });
+      rects.transition().duration(650).delay(function (d, i) { return i * 35; }).ease(d3.easeCubicOut)
+        .attr("width", function (d) { return x(d.value); });
       g.selectAll(".lbl").data(entries).enter().append("text")
         .attr("class", "bar-label")
         .attr("y", function (d) { return y(d.label) + y.bandwidth() / 2 + 4; })
-        .attr("x", function (d) { return x(d.value) + 8; })
-        .text(function (d) { return fmt(d.value); });
+        .attr("x", 8)
+        .style("opacity", 0)
+        .text(function (d) { return fmt(d.value); })
+        .transition().duration(300).delay(function (d, i) { return i * 35 + 500; })
+        .style("opacity", 1)
+        .attr("x", function (d) { return x(d.value) + 8; });
       g.selectAll(".cat").data(entries).enter().append("text")
         .attr("class", "axis-cat")
         .attr("y", function (d) { return y(d.label) + y.bandwidth() / 2 + 4; })
         .attr("x", -8).attr("text-anchor", "end")
         .style("font-weight", function (d) { return API_REGULATORS.indexOf(d.label) !== -1 ? "700" : "400"; })
+        .classed("clickable-el", clickable)
         .text(function (d) { return catLabel(d.label, 20); })
+        .on("click", clickable ? function (event, d) { opts.onClick(d.label); } : null)
         .append("title").text(function (d) { return d.tooltip || (d.label + (API_REGULATORS.indexOf(d.label) !== -1 ? " — integração via API" : "")); });
     } else {
       var x2 = d3.scaleBand().domain(entries.map(function (d) { return d.label; })).range([0, innerW]).padding(0.32);
       var y2 = d3.scaleLinear().domain([0, maxVal * 1.15]).range([innerH, 0]);
-      g.selectAll("rect").data(entries).enter().append("rect")
+      var rects2 = g.selectAll("rect").data(entries).enter().append("rect")
         .attr("x", function (d) { return x2(d.label); })
-        .attr("y", function (d) { return y2(d.value); })
+        .attr("y", innerH)
         .attr("width", x2.bandwidth())
-        .attr("height", function (d) { return innerH - y2(d.value); })
+        .attr("height", 0)
         .attr("rx", 4)
         .attr("fill", function (d) { return d.color; })
-        .append("title").text(function (d) { return d.tooltip || (d.label + ": " + fmt(d.value)); });
+        .attr("stroke", function (d) { return isActive(d) ? "var(--color-fg)" : "none"; })
+        .attr("stroke-width", function (d) { return isActive(d) ? 2 : 0; })
+        .style("opacity", function (d) { return (activeFilter && !isActive(d) && opts.filterDim === activeFilter.dim) ? 0.4 : 1; })
+        .classed("clickable-el", clickable);
+      if (clickable) rects2.on("click", function (event, d) { opts.onClick(d.label); });
+      rects2.append("title").text(function (d) { return d.tooltip || (d.label + ": " + fmt(d.value)); });
+      rects2.transition().duration(650).delay(function (d, i) { return i * 60; }).ease(d3.easeCubicOut)
+        .attr("y", function (d) { return y2(d.value); })
+        .attr("height", function (d) { return innerH - y2(d.value); });
       g.selectAll(".lbl").data(entries).enter().append("text")
         .attr("class", "bar-label").attr("text-anchor", "middle")
         .attr("x", function (d) { return x2(d.label) + x2.bandwidth() / 2; })
-        .attr("y", function (d) { return y2(d.value) - 8; })
-        .text(function (d) { return fmt(d.value); });
+        .attr("y", innerH - 8)
+        .style("opacity", 0)
+        .text(function (d) { return fmt(d.value); })
+        .transition().duration(300).delay(function (d, i) { return i * 60 + 500; })
+        .style("opacity", 1)
+        .attr("y", function (d) { return y2(d.value) - 8; });
       g.selectAll(".cat").data(entries).enter().append("text")
         .attr("class", "axis-cat").attr("text-anchor", "middle")
         .attr("x", function (d) { return x2(d.label) + x2.bandwidth() / 2; })
@@ -1389,7 +1512,8 @@
     }
   }
 
-  function drawDonut(sel, entries) {
+  function drawDonut(sel, entries, opts) {
+    opts = opts || {};
     var container = d3.select(sel);
     container.selectAll("*").remove();
     var total = d3.sum(entries, function (d) { return d.value; });
@@ -1405,13 +1529,22 @@
 
     var pie = d3.pie().value(function (d) { return d.value; }).sort(null);
     var arc = d3.arc().innerRadius(radius * 0.58).outerRadius(radius);
+    var clickable = !!opts.onClick;
+    function isActive(d) { return activeFilter && opts.filterDim === activeFilter.dim && d.data.label === activeFilter.value; }
 
-    g.selectAll("path").data(pie(entries)).enter().append("path")
-      .attr("d", arc)
+    var paths = g.selectAll("path").data(pie(entries)).enter().append("path")
       .attr("fill", function (d) { return d.data.color; })
       .attr("stroke", "var(--color-panel)")
       .attr("stroke-width", 2)
-      .append("title").text(function (d) { return d.data.label + ": " + fmt(d.data.value); });
+      .style("opacity", function (d) { return (activeFilter && !isActive(d) && opts.filterDim === activeFilter.dim) ? 0.4 : 1; })
+      .classed("clickable-el", clickable);
+    if (clickable) paths.on("click", function (event, d) { opts.onClick(d.data.label); });
+    paths.append("title").text(function (d) { return d.data.label + ": " + fmt(d.data.value); });
+    paths.transition().duration(700).ease(d3.easeCubicOut)
+      .attrTween("d", function (d) {
+        var interp = d3.interpolate({ startAngle: 0, endAngle: 0 }, d);
+        return function (t) { return arc(interp(t)); };
+      });
 
     g.selectAll(".val").data(pie(entries)).enter().append("text")
       .attr("transform", function (d) { return "translate(" + arc.centroid(d) + ")"; })
@@ -1419,7 +1552,10 @@
       .attr("fill", "#fff")
       .style("font-size", "12px").style("font-weight", "700")
       .style("pointer-events", "none")
-      .text(function (d) { return (d.data.value / total * 100) >= 4 ? fmt(d.data.value) : ""; });
+      .style("opacity", 0)
+      .text(function (d) { return (d.data.value / total * 100) >= 4 ? fmt(d.data.value) : ""; })
+      .transition().duration(300).delay(500)
+      .style("opacity", 1);
 
     var legend = svg.append("g").attr("transform", "translate(" + (W / 2) + "," + (H - 14) + ")");
     var lx = 0;
@@ -1428,7 +1564,9 @@
     var totalWidth = d3.sum(widths);
     var startX = -totalWidth / 2;
     entries.forEach(function (e, i) {
-      var grp = legend.append("g").attr("transform", "translate(" + (startX + lx) + ",0)");
+      var grp = legend.append("g").attr("transform", "translate(" + (startX + lx) + ",0)")
+        .classed("clickable-el", clickable);
+      if (clickable) grp.on("click", function () { opts.onClick(e.label); });
       grp.append("rect").attr("width", 9).attr("height", 9).attr("y", -8).attr("rx", 2).attr("fill", e.color);
       grp.append("text").attr("class", "legend-item").attr("x", 13).text(items[i]);
       lx += widths[i];
