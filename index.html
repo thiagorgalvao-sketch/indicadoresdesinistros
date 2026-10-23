@@ -136,9 +136,72 @@
   .status-msg.ok { color: var(--color-green); }
   .status-msg.warn { color: #9C5A12; }
 
+  .tab-nav { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--color-border-line); }
+  .tab-btn {
+    background: transparent; border: none; border-bottom: 2.5px solid transparent;
+    color: var(--color-fg-muted); font-family: inherit; font-size: 12.5px; font-weight: 700;
+    letter-spacing: .03em; padding: 10px 6px; margin-bottom: -1px; cursor: pointer;
+  }
+  .tab-btn:hover { color: var(--color-fg); }
+  .tab-btn.active { color: var(--color-navy); border-bottom-color: var(--color-navy); }
+  :root[data-theme="dark"] .tab-btn.active { color: var(--color-accent-strong); border-bottom-color: var(--color-accent-strong); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tab-btn.active { color: var(--color-accent-strong); border-bottom-color: var(--color-accent-strong); } }
+
+  .case-header { margin-bottom: 20px; }
+  .case-header .tag { font-size: 11px; font-weight: 700; color: var(--color-fg-muted); letter-spacing: .04em; }
+  .case-header h2 { font-size: 19px; margin: 4px 0 2px; color: var(--color-fg); }
+  .case-header p { margin: 0; font-size: 12.5px; color: var(--color-fg-muted); }
+  .period-bar {
+    background: var(--color-panel); border: 1px solid var(--color-border-line);
+    border-radius: 12px 12px 0 0; border-bottom: none;
+    padding: 14px 18px; margin-bottom: 0;
+  }
+  .period-bar-label {
+    display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--color-fg);
+    margin-bottom: 10px;
+  }
+  .period-bar-caption { font-size: 11.5px; color: var(--color-fg-muted); margin-top: 8px; }
+  .period-bar.standalone { border-radius: 12px; border-bottom: 1px solid var(--color-border-line); margin-bottom: 26px; }
+
+  .case-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 8px; }
+  .case-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 8px; }
+  @media (max-width: 900px) { .case-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .case-grid, .case-grid-2 { grid-template-columns: 1fr; } }
+  .case-metric { display: flex; flex-direction: column; gap: 6px; }
+  .case-metric-title { font-size: 13px; font-weight: 700; color: var(--color-fg); }
+  .case-metric-meta { font-size: 11px; color: var(--color-fg-muted); font-weight: 600; }
+  .case-metric-value { font-size: 24px; font-weight: 700; color: var(--color-navy); margin-top: 2px; }
+  :root[data-theme="dark"] .case-metric-value { color: var(--color-accent-strong); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .case-metric-value { color: var(--color-accent-strong); } }
+  .case-automacao-breakdown {
+    display: flex; gap: 14px; margin-top: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--color-border-line);
+  }
+  .case-mini-stat { display: flex; flex-direction: column; }
+  .case-mini-stat .n { font-size: 17px; font-weight: 700; color: var(--color-fg); }
+  .case-mini-stat .l { font-size: 10px; color: var(--color-fg-muted); font-weight: 600; }
+  .case-automacao-pct { font-size: 34px; margin-top: 8px; }
+  .case-automacao-pct.goal-hit { color: var(--color-green); }
+  .goal-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--color-green);
+    background: var(--color-green-bg); padding: 2px 9px; border-radius: 999px; margin-left: 6px; vertical-align: middle;
+  }
+  .case-sub { font-size: 11px; font-weight: 500; color: var(--color-fg-muted); margin-top: 3px; }
+  .case-blocked {
+    font-size: 12px; color: var(--color-fg-muted); font-style: italic; background: var(--color-bg);
+    border: 1px dashed var(--color-border-line); border-radius: 8px; padding: 10px 12px; margin-top: 2px;
+  }
+  .case-needed { font-size: 11px; color: var(--color-fg-muted); margin-top: 2px; }
+  .case-source-note { font-size: 11px; color: var(--color-fg-muted); margin: 4px 0 24px; }
+  .case-checklist { display: flex; flex-direction: column; gap: 14px; }
+  .checklist-item { display: flex; align-items: flex-start; gap: 10px; }
+  .checklist-box { font-size: 17px; color: var(--color-fg-muted); line-height: 1.3; flex-shrink: 0; }
+  .checklist-item > div { font-size: 12.5px; color: var(--color-fg); line-height: 1.5; }
+  .checklist-activates { display: block; font-size: 11px; color: var(--color-fg-muted); margin-top: 2px; }
+
   .toolbar-row {
+    background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 0 0 12px 12px;
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    flex-wrap: wrap; margin-bottom: 8px;
+    flex-wrap: wrap; padding: 14px 18px; margin-bottom: 26px;
   }
   .toolbar-left { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
   .filter-group, .compare-group { display: flex; align-items: center; gap: 8px; }
@@ -393,6 +456,21 @@
     </div>
   </header>
 
+  <div class="tab-nav" id="tabNav" style="display:none;">
+    <button type="button" class="tab-btn active" data-tab="operacao">OPERAÇÃO</button>
+    <button type="button" class="tab-btn" data-tab="case">MÉTRICAS-CHAVE DO CASE</button>
+  </div>
+
+  <div class="period-bar" id="periodBar" style="display:none;">
+    <div class="period-bar-label">📅 <strong>Período de análise</strong><span class="info-dot" data-tip="Define quais sinistros entram nos cálculos do painel, com base na data em que foram abertos. Não afeta o filtro de data abaixo, que continua valendo dentro do período escolhido aqui.">?</span></div>
+    <div class="seg-group" id="caseDateGroup">
+      <button type="button" class="seg-btn seg-neutral" data-mode="tudo">Toda a base (Quiver + Lecom)</button>
+      <button type="button" class="seg-btn seg-neutral" data-mode="antes">Base QUIVER</button>
+      <button type="button" class="seg-btn seg-neutral" data-mode="golive">Base LECOM</button>
+    </div>
+    <div class="period-bar-caption" id="periodCaption"></div>
+  </div>
+
   <div class="toolbar-row" id="toolbarRow" style="display:none;">
     <div class="toolbar-left">
       <div class="filter-group" id="filterGroup">
@@ -473,6 +551,10 @@
   // activeFilter = { dim: "reg"|"analyst"|"origem"|"status"|"statusgroup", value, displayLabel }
   var activeFilter = null;
 
+  // --------- abas: OPERAÇÃO x MÉTRICAS-CHAVE DO CASE ---------
+  var activeTab = "operacao";
+  var caseDateMode = "golive"; // "tudo" | "antes" | "golive" — período usado nos cálculos da aba Case
+
   function applyActiveFilter(rowData, regIndex, analystIndex, filter) {
     if (!filter) return rowData;
     return rowData.filter(function (row) {
@@ -509,6 +591,9 @@
   var processBtn = document.getElementById("processBtn");
   var statusMsg = document.getElementById("statusMsg");
   var content = document.getElementById("content");
+  var tabNav = document.getElementById("tabNav");
+  var periodBar = document.getElementById("periodBar");
+  var periodCaption = document.getElementById("periodCaption");
   var toolbarRow = document.getElementById("toolbarRow");
   var compareSelect = document.getElementById("compareSelect");
   var compareGroup = document.getElementById("compareGroup");
@@ -595,6 +680,21 @@
   var showAllAnalysts = false;
   var analystFilter = "aberto";
   var currentDb = null;
+
+  tabNav.querySelectorAll(".tab-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      activeTab = btn.getAttribute("data-tab");
+      tabNav.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.toggle("active", b === btn); });
+      renderDashboard();
+    });
+  });
+
+  document.querySelectorAll("#caseDateGroup [data-mode]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      caseDateMode = btn.getAttribute("data-mode");
+      renderDashboard();
+    });
+  });
 
   // --------- dicas (?) — funciona por clique/toque, não depende de hover (não existe no celular) ---------
   var tipBubble = document.getElementById("tipBubble");
@@ -946,7 +1046,14 @@
         if (!isNaN(dl.getTime())) liqDays = daysSinceEpoch(dl);
       }
 
-      rowData.push([daysSinceEpoch(d), statusCode, origemCode, regIdx, liqDays, analistaIdx]);
+      var pagamentoRaw = r["Data do pagamento"] || r["Data de pagamento"] || r["Data de Pagamento"];
+      var pagDays = null;
+      if (pagamentoRaw) {
+        var dp = new Date(pagamentoRaw);
+        if (!isNaN(dp.getTime())) pagDays = daysSinceEpoch(dp);
+      }
+
+      rowData.push([daysSinceEpoch(d), statusCode, origemCode, regIdx, liqDays, analistaIdx, pagDays]);
     });
 
     var totals = computeCumulative(rowData, regIndex, analystIndex, Infinity);
@@ -1075,6 +1182,8 @@
     db.collection("snapshots").orderBy("uploadedAt", "desc").limit(20).get().then(function (snap) {
       processBtn.disabled = !pendingRows;
       if (snap.empty) {
+        tabNav.style.display = "none";
+        periodBar.style.display = "none";
         toolbarRow.style.display = "none";
         filterExplain.style.display = "none";
         sourceBadge.style.display = "none";
@@ -1093,6 +1202,7 @@
       withRows.sort(function (a, b) { return new Date(b.data.uploadedAt) - new Date(a.data.uploadedAt); });
       sourceDoc = withRows.length ? withRows[0] : null;
 
+      tabNav.style.display = "flex";
       toolbarRow.style.display = "flex";
       compareGroup.style.display = "flex";
       uploadCard.classList.add("collapsed");
@@ -1159,6 +1269,186 @@
     return parts.length ? parts.join(" ") : null;
   }
 
+  var BLOCKED_MSG = "A plataforma Lecom não possui dados que permitam gerar este indicador";
+
+  function caseMetricCard(title, meta, valueHtml, neededNote) {
+    var blocked = !valueHtml;
+    return '<div class="card case-metric">' +
+      '<div class="case-metric-title">' + title + '</div>' +
+      (meta ? '<div class="case-metric-meta">Meta: ' + meta + '</div>' : '') +
+      (blocked
+        ? '<div class="case-blocked">' + BLOCKED_MSG + '.</div>' + (neededNote ? '<div class="case-needed">📋 ' + neededNote + '</div>' : '')
+        : '<div class="case-metric-value">' + valueHtml + '</div>') +
+      '</div>';
+  }
+
+  // Monta a aba "Métricas-chave do Case" — todas as métricas e ganhos do case aprovado
+  // (Case SVP Transportes, slides 5 e 6), mesmo as que ainda não têm dado na Lecom.
+  // Calcula automação considerando só sinistros ABERTOS DESDE O GO-LIVE (23/09/2026) —
+  // a partir dessa data os usuários passaram a operar na plataforma e as reguladoras a
+  // enviar por API, então migração histórica (Quiver) não deve entrar nessa conta.
+  function computeAutomacao(rowData, rangeStartDays, rangeEndDays) {
+    if (!rowData) return null;
+    var api = 0, manual = 0;
+    rowData.forEach(function (row) {
+      var abDays = row[0], origemCode = row[2];
+      if (abDays < rangeStartDays || abDays > rangeEndDays) return;
+      if (origemCode === 0) api++;
+      else if (origemCode !== 1) manual++; // exclui eventual resquicio de migracao (codigo 1)
+    });
+    var base = api + manual;
+    return { api: api, manual: manual, base: base, pct: base > 0 ? Math.round((api / base) * 100) : null };
+  }
+
+  // Calcula o SLA medio (Abertura -> Pagamento) dentro do intervalo informado. Enquanto
+  // nao houver nenhuma data de pagamento preenchida no intervalo, usa um PROXY
+  // provisorio: tempo medio em aberto (abertura -> hoje/data de corte) para os mesmos
+  // processos. Assim que existir ao menos 1 pagamento real no intervalo, passa a usar
+  // sempre o calculo real (Abertura -> Pagamento).
+  function computeSla(rowData, rangeStartDays, rangeEndDays, todayDays) {
+    if (!rowData) return null;
+    var somaReal = 0, countReal = 0;
+    var somaProxy = 0, countProxy = 0;
+    rowData.forEach(function (row) {
+      var abDays = row[0], pagDays = row[6];
+      if (abDays < rangeStartDays || abDays > rangeEndDays) return;
+      countProxy++;
+      somaProxy += (todayDays - abDays);
+      if (pagDays !== undefined && pagDays !== null) {
+        var dias = pagDays - abDays;
+        if (dias >= 0) { somaReal += dias; countReal++; }
+      }
+    });
+    if (countReal > 0) return { mode: "real", count: countReal, avgDays: Math.round(somaReal / countReal) };
+    if (countProxy > 0) return { mode: "proxy", count: countProxy, avgDays: Math.round(somaProxy / countProxy) };
+    return null;
+  }
+
+  // Filtra rowData pelo modo de período escolhido (compartilhado entre as duas abas):
+  // "tudo" nao filtra nada, "antes" so abertura < Go-Live, "golive" so abertura >= Go-Live.
+  function applyDateRangeMode(rowData, mode, cutoffDate) {
+    if (!rowData || mode === "tudo") return rowData;
+    var goDays = daysSinceEpoch(GO_LIVE_DATE);
+    var cutDays = daysSinceEpoch(cutoffDate);
+    var rangeStart, rangeEnd;
+    if (mode === "antes") { rangeStart = -Infinity; rangeEnd = Math.min(goDays - 1, cutDays); }
+    else { rangeStart = goDays; rangeEnd = cutDays; } // golive
+    return rowData.filter(function (row) { return row[0] >= rangeStart && row[0] <= rangeEnd; });
+  }
+
+  // atualiza só o estado visual do bloco fixo "Período de análise" (botão ativo + legenda)
+  function updatePeriodBar() {
+    document.querySelectorAll("#caseDateGroup [data-mode]").forEach(function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-mode") === caseDateMode);
+    });
+    periodCaption.textContent = caseDateMode === "antes"
+      ? "Sinistros abertos até 22/09/2026 — base migrada do Quiver."
+      : caseDateMode === "golive"
+      ? "Sinistros abertos a partir de 23/09/2026 — operação na Lecom."
+      : "Todos os sinistros (Quiver + Lecom).";
+  }
+
+  function renderCaseTab(current, effectiveRowData, cutoffDate) {
+    var html = "";
+    var goDays = daysSinceEpoch(GO_LIVE_DATE);
+    var cutDays = daysSinceEpoch(cutoffDate);
+    var rangeStart, rangeEnd, periodoTxt;
+    if (caseDateMode === "antes") {
+      rangeStart = -Infinity;
+      rangeEnd = Math.min(goDays - 1, cutDays);
+      periodoTxt = "antes do Go-Live (até 22/09/2026)";
+    } else if (caseDateMode === "golive") {
+      rangeStart = goDays;
+      rangeEnd = cutDays;
+      periodoTxt = "pós Go-Live (desde 23/09/2026)";
+    } else { // tudo
+      rangeStart = -Infinity;
+      rangeEnd = cutDays;
+      periodoTxt = "toda a base (antes e pós Go-Live)";
+    }
+
+    html += '<div class="case-header">' +
+      '<div class="tag">CASE APROVADO — SVP TRANSPORTES 2026</div>' +
+      '<h2>Métricas-chave do projeto Workflow de Sinístros</h2>' +
+      '<p>Extraído do case "Squad SVP Transportes — Aprovação de Squad 2026" (fevereiro/2026), slides 5 e 6.</p>' +
+      '</div>';
+
+    html += '<div class="section-title">Indicadores-chave</div>';
+    html += '<div class="case-grid">';
+
+    // 1) % automacao — unico que temos dado real hoje, via Origem do Sinistro
+    var autoCalc = computeAutomacao(effectiveRowData, rangeStart, rangeEnd);
+    if (autoCalc && autoCalc.base > 0) {
+      var autoOk = autoCalc.pct >= 40;
+      html += '<div class="card case-metric" style="grid-column: span 2;">' +
+        '<div class="case-metric-title">% de automação (coleta e análise)' + (autoOk ? ' <span class="goal-badge">✅ Meta atingida</span>' : '') + '</div>' +
+        '<div class="case-metric-meta">Meta: 40% · ' + periodoTxt + '</div>' +
+        '<div class="case-automacao-breakdown">' +
+        '<div class="case-mini-stat"><span class="n">' + fmt(autoCalc.base) + '</span><span class="l">Total abertos</span></div>' +
+        '<div class="case-mini-stat"><span class="n">' + fmt(autoCalc.api) + '</span><span class="l">Via API</span></div>' +
+        '<div class="case-mini-stat"><span class="n">' + fmt(autoCalc.manual) + '</span><span class="l">Manual</span></div>' +
+        '</div>' +
+        '<div class="case-metric-value case-automacao-pct' + (autoOk ? ' goal-hit' : '') + '">' + autoCalc.pct + '%</div>' +
+        '</div>';
+    } else {
+      html += caseMetricCard("% de automação (coleta e análise)", "40%", null,
+        "Nenhum processo encontrado " + periodoTxt + " no período selecionado para calcular.");
+    }
+
+    // 2) Reducao de custo da area — bloqueado (dado de RH)
+    html += caseMetricCard("Redução de custo da área", "-29,03%", null,
+      "Precisa de headcount e salário bruto por cargo (RH).");
+
+    // 3) SLA Abertura -> Pagamento — real quando houver pagamentos; proxy (tempo em
+    // aberto) enquanto não houver nenhum
+    var slaCalc = computeSla(effectiveRowData, rangeStart, rangeEnd, cutDays);
+    if (slaCalc && slaCalc.mode === "real") {
+      html += '<div class="card case-metric">' +
+        '<div class="case-metric-title">SLA do sinistro (Abertura → Pagamento)</div>' +
+        '<div class="case-metric-meta">Meta: Redução do tempo total · ' + periodoTxt + '</div>' +
+        '<div class="case-metric-value">' + slaCalc.avgDays + ' dias</div>' +
+        '<div class="case-sub">Média sobre ' + fmt(slaCalc.count) + ' processos já pagos no período</div>' +
+        '</div>';
+    } else if (slaCalc && slaCalc.mode === "proxy") {
+      html += '<div class="card case-metric">' +
+        '<div class="case-metric-title">SLA do sinistro (Abertura → Pagamento)</div>' +
+        '<div class="case-metric-meta">Meta: Redução do tempo total · ' + periodoTxt + '</div>' +
+        '<div class="case-metric-value">' + slaCalc.avgDays + ' dias</div>' +
+        '<div class="case-sub">⚠️ Proxy provisório: ainda sem nenhuma data de pagamento preenchida — mostrando o tempo médio em aberto (abertura até hoje) de ' + fmt(slaCalc.count) + ' processos. Assim que houver pagamentos registrados, passa a usar o cálculo real.</div>' +
+        '</div>';
+    } else {
+      html += caseMetricCard("SLA do sinistro (Abertura → Pagamento)", "Redução do tempo total", null,
+        "Nenhum processo encontrado " + periodoTxt + " no período selecionado para calcular.");
+    }
+
+    // 4) NPS — bloqueado (pesquisa externa)
+    html += caseMetricCard("NPS da nova interface", ">40 no ano 1 · 55+ em 3 anos", null,
+      "Precisa de pesquisa de satisfação externa (ex.: Typeform, Qualtrics) — não existe no Lecom.");
+
+    // 5) Custo hora/homem por processo — bloqueado (falta parte do RH)
+    html += caseMetricCard("Custo (hora/homem) por processo aberto", "Redução de custo por sinistro", null,
+      "O volume por analista já existe na aba Operação; falta o salário por pessoa (RH) para calcular o custo.");
+
+    html += '</div>';
+
+    html += '<div class="section-title">Ganhos e captura de valor (3 anos)</div>';
+    html += '<div class="case-grid-2">';
+    html += caseMetricCard("Captura de valor — Eficiência Operacional", "R$ 1.141.953,12 em 3 anos", null,
+      "Calculado a partir de dados de headcount e salário bruto (RH), não do Lecom.");
+    html += caseMetricCard("Satisfação e Retenção (NPS)", ">40 (ano 1) · 55+ (3 anos)", null,
+      "Mesma pendência do indicador de NPS acima — requer pesquisa de satisfação externa.");
+    html += '</div>';
+    html += '<div class="case-source-note">Fonte: Case SVP Transportes — Aprovação de Squad 2026, slides 5 ("Métricas-chave" e "Ganhos identificados") e 6 ("Zoom — Captura de Valor").</div>';
+
+    html += '<div class="section-title">Checklist — dados fora da Lecom pendentes de captura</div>';
+    html += '<div class="card case-checklist">' +
+      '<div class="checklist-item"><span class="checklist-box">☐</span><div><strong>Dados de RH</strong> (headcount por cargo + salário bruto) <span class="checklist-activates">ativa: Redução de custo da área · Custo por sinistro · Captura de valor</span></div></div>' +
+      '<div class="checklist-item"><span class="checklist-box">☐</span><div><strong>Pesquisa de satisfação</strong> (ferramenta de NPS, ex.: Typeform, Qualtrics) <span class="checklist-activates">ativa: NPS da nova interface · Satisfação e Retenção</span></div></div>' +
+      '</div>';
+
+    return html;
+  }
+
   function renderDashboard() {
     var current, previous, cutoffDate, previousCutoffDate;
 
@@ -1166,16 +1456,17 @@
       cutoffDate = dateFilter.value ? new Date(dateFilter.value + "T12:00:00") : dateFromDays(Math.max.apply(null, sourceDoc.data.rowData.map(function (r) { return r[0]; })));
       var curDays = daysSinceEpoch(cutoffDate);
       var effectiveRowData = applyActiveFilter(sourceDoc.data.rowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, activeFilter);
-      current = computeCumulative(effectiveRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, curDays);
+      var operacaoRowData = applyDateRangeMode(effectiveRowData, caseDateMode, cutoffDate);
+      current = computeCumulative(operacaoRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, curDays);
 
       var mode = compareSelect.value || "1d";
       previousCutoffDate = mode === "7d" ? daysBack(cutoffDate, 7) : mode === "30d" ? monthsBack(cutoffDate, 1) : mode === "365d" ? monthsBack(cutoffDate, 12) : daysBack(cutoffDate, 1);
       var prevDays = daysSinceEpoch(previousCutoffDate);
-      previous = computeCumulative(effectiveRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, prevDays);
+      previous = computeCumulative(operacaoRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, prevDays);
 
       filterExplain.style.display = "block";
       filterExplain.textContent = "Mostrando sinistros com abertura até " + fmtDate(cutoffDate) +
-        "  •  comparando com sinistros com abertura até " + fmtDate(previousCutoffDate);
+        "  •  Comparando com sinistros com abertura até " + fmtDate(previousCutoffDate);
     } else if (allDocs.length) {
       current = allDocs[0].data;
       previous = null;
@@ -1184,6 +1475,20 @@
     } else {
       return;
     }
+
+    if (activeTab === "case") {
+      toolbarRow.style.display = "none";
+      filterExplain.style.display = "none";
+      periodBar.style.display = "block";
+      periodBar.classList.add("standalone");
+      updatePeriodBar();
+      content.innerHTML = renderCaseTab(current, effectiveRowData, cutoffDate);
+      return;
+    }
+    toolbarRow.style.display = "flex";
+    periodBar.style.display = "block";
+    periodBar.classList.remove("standalone");
+    updatePeriodBar();
 
     var html = "";
 
@@ -1212,16 +1517,6 @@
     // resumo executivo automático — quando o alerta crítico já aparece, o resumo não repete
     // o mesmo percentual, só complementa com tendência e atraso médio
     var summaryText = buildSummary(current, previous, showAlert);
-    if (summaryText) {
-      html += '<div class="summary-banner">📌 ' + summaryText + '</div>';
-    }
-
-    if (showAlert) {
-      html += '<div class="alert-banner"><div class="icon">⚠️</div><div>' +
-        '<strong>' + fmt(current.atrasado) + ' processos atrasados</strong> — ' +
-        (atrasoRate * 100).toFixed(0) + '% dos processos em aberto (' + fmt(current.aberto) + ') estão com prazo vencido.' +
-        '</div></div>';
-    }
 
     // KPI cards
     html += '<div class="kpi-grid">';
@@ -1232,7 +1527,18 @@
     html += kpiCard("Atraso médio (dias)", current.atrasoMedioDias, previous && previous.atrasoMedioDias, true, true, "📅", COLORS.maroon, "Média de dias em atraso dos processos que estão atrasados HOJE (na data de corte escolhida), contando a partir da data de abertura de cada um.");
     html += "</div>";
 
-    // legenda de cores — vale para os gráficos e KPIs do painel inteiro
+    // resumo executivo e alerta de atraso
+    if (summaryText) {
+      html += '<div class="summary-banner">📌 ' + summaryText + '</div>';
+    }
+    if (showAlert) {
+      html += '<div class="alert-banner"><div class="icon">⚠️</div><div>' +
+        '<strong>' + fmt(current.atrasado) + ' processos atrasados</strong> — ' +
+        (atrasoRate * 100).toFixed(0) + '% dos processos em aberto (' + fmt(current.aberto) + ') estão com prazo vencido.' +
+        '</div></div>';
+    }
+
+    // legenda de cores — logo antes dos gráficos que usam essas cores
     html += '<div class="color-legend">' +
       '<span class="item"><span class="dot" style="background:' + COLORS.navy + ';"></span>Total / neutro</span>' +
       '<span class="item"><span class="dot" style="background:' + COLORS.amber + ';"></span>Em aberto / atenção</span>' +
