@@ -167,6 +167,7 @@
   .case-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 8px; }
   @media (max-width: 900px) { .case-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 600px) { .case-grid, .case-grid-2 { grid-template-columns: 1fr; } }
+  @media (max-width: 500px) { .assoc-total-highlight { grid-template-columns: 1fr; } }
   .case-metric { display: flex; flex-direction: column; gap: 6px; }
   .case-metric-title { font-size: 13px; font-weight: 700; color: var(--color-fg); }
   .case-metric-meta { font-size: 11px; color: var(--color-fg-muted); font-weight: 600; }
@@ -303,8 +304,31 @@
 
   .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 760px) { .chart-grid { grid-template-columns: 1fr; } }
+  .assoc-breakdown-card { margin-top: 16px; }
+  .assoc-breakdown-card h3 { font-size: 13px; margin: 0 0 10px; color: var(--color-fg); font-weight: 700; }
+  .assoc-total-highlight {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding-bottom: 16px;
+    margin-bottom: 16px; border-bottom: 1px solid var(--color-border-line);
+  }
+  .assoc-total-stat { display: flex; flex-direction: column; }
+  .assoc-total-stat .n { font-size: 36px; font-weight: 700; line-height: 1.1; }
+  .assoc-total-stat .l { font-size: 11.5px; color: var(--color-fg-muted); font-weight: 600; margin-top: 4px; }
+  .assoc-group-label {
+    font-size: 10.5px; font-weight: 700; color: var(--color-fg-muted); letter-spacing: .04em;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .assoc-legend { display: flex; gap: 16px; margin: 10px 0 2px; font-size: 11.5px; color: var(--color-fg-muted); }
+  .assoc-legend .item { display: flex; align-items: center; gap: 5px; }
+  .assoc-legend .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
   .chart-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 14px; padding: 16px 18px 10px; }
   .chart-card h3 { font-size: 13px; margin: 0 0 10px; color: var(--color-fg); font-weight: 700; }
+  .etapa-group-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+    padding: 8px 10px; border-radius: 6px; margin-bottom: 8px;
+  }
+  .etapa-group-andamento { color: var(--color-amber); background: var(--color-amber-bg); }
+  .etapa-group-finalizado { color: var(--color-green); background: var(--color-green-bg); margin-top: 18px; }
+  .etapa-card #chart-etapa-andamento, .etapa-card #chart-etapa-finalizado { margin-bottom: 4px; }
   .chart-card-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
 
   .color-legend {
@@ -519,6 +543,77 @@
   };
   var NAO_INFORMADA = "REGULADORA NÃO INFORMADA";
   var ANALISTA_NAO_INFORMADO = "ANALISTA NÃO INFORMADO";
+  var GERENTE_NAO_INFORMADO = "GERENTE NÃO INFORMADO";
+  var ETAPA_NAO_INFORMADA = "ETAPA NÃO INFORMADA";
+  // Nomes das etapas conforme o fluxo padrão do processo de sinistro (BPMN Lecom).
+  // A chave é o texto da planilha em minúsculo/sem espaços extras; o valor é o rótulo
+  // bonito exibido no painel. Valores que não batem com nenhuma chave aparecem como
+  // vieram da planilha, sem quebrar nada.
+  var ETAPA_LABELS = {
+    // formato real da planilha (ex.: REGISTRAR_SINISTRO), em minúsculo p/ comparação
+    "registrar_sinistro": "Registrar Sinistro",
+    "fila_de_distribuicao_de_sinistros": "Fila de Distribuição de Sinistros",
+    "distribuicao_de_sinistros": "Fila de Distribuição de Sinistros",
+    "atualizando_dados": "Atualizando Dados",
+    "aguardando_dados_do_segurado": "Aguardando Dados do Segurado",
+    "aguardando_protecao_360": "Aguardando Proteção 360",
+    "revisando_recomendacao": "Revisando Recomendação",
+    "aguardando_parecer": "Aguardando Parecer",
+    "elaborando_defesa": "Elaborando Defesa",
+    "aguardando_parecer_final": "Aguardando Parecer Final",
+    "aguardando_informacoes_de_pagamento": "Aguardando Informações de Pagamento",
+    "aguardando_pagamento": "Aguardando Pagamento",
+    "encerrar_processo_pago": "Pago",
+    "encerrar_processo_nao_pago": "Não Pago",
+    "encerrar_processo_sem_prejuizo": "Sem prejuízo",
+    "cancelar": "Cancelado",
+    // formatos alternativos (texto com espaços), mantidos por segurança caso a planilha mude
+    "registrar sinistro": "Registrar Sinistro",
+    "fila de distribuição de sinistros": "Fila de Distribuição de Sinistros",
+    "distribuição de sinistros": "Fila de Distribuição de Sinistros",
+    "atualizando dados": "Atualizando Dados",
+    "aguardando dados do segurado": "Aguardando Dados do Segurado",
+    "aguardando proteção 360": "Aguardando Proteção 360",
+    "revisando recomendação": "Revisando Recomendação",
+    "aguardando parecer": "Aguardando Parecer",
+    "elaborando defesa": "Elaborando Defesa",
+    "aguardando parecer final": "Aguardando Parecer Final",
+    "aguardando informações de pagamento": "Aguardando Informações de Pagamento",
+    "aguardando pagamento": "Aguardando Pagamento",
+    "encerrar processo - pago": "Pago",
+    "encerrar processo - não pago": "Não Pago",
+    "encerrar processo - sem prejuízo": "Sem prejuízo",
+  };
+  // Etapas que marcam o FIM do processo (círculos de término no fluxo) — usadas para
+  // separar visualmente "em andamento" de "finalizado" no gráfico de etapas.
+  var ETAPA_FINALIZADAS = [
+    "Pago",
+    "Não Pago",
+    "Sem prejuízo",
+    "Cancelado",
+  ];
+  // Ordem cronológica das etapas no fluxo padrão do processo de sinistro — usada para
+  // ordenar o gráfico "Atividade atual" pela sequência do fluxo, não por quantidade.
+  // Ordem cronológica das etapas EM ANDAMENTO no fluxo padrão — usada para ordenar o
+  // gráfico "Atividade atual" pela sequência do fluxo, não por quantidade. As etapas
+  // finalizadas (ETAPA_FINALIZADAS) ordenam por quantidade, não entram nesta lista.
+  var ETAPA_ORDEM = [
+    "Registrar Sinistro",
+    "Fila de Distribuição de Sinistros",
+    "Atualizando Dados",
+    "Aguardando Dados do Segurado",
+    "Aguardando Proteção 360",
+    "Revisando Recomendação",
+    "Aguardando Parecer",
+    "Elaborando Defesa",
+    "Aguardando Parecer Final",
+    "Aguardando Informações de Pagamento",
+    "Aguardando Pagamento",
+  ];
+  function etapaLabel(raw) {
+    var key = String(raw || "").trim().toLowerCase();
+    return ETAPA_LABELS[key] || raw;
+  }
   var CONTA_DE_SISTEMA = "CONTA DE SISTEMA";
   var CONTAS_DE_SISTEMA_RAW = ["tarefa.automatica", "adm"];
   var API_REGULATORS = ["Dórica Reguladora", "L Perna", "Fox", "Serra & Company"];
@@ -555,7 +650,7 @@
   var activeTab = "operacao";
   var caseDateMode = "golive"; // "tudo" | "antes" | "golive" — período usado nos cálculos da aba Case
 
-  function applyActiveFilter(rowData, regIndex, analystIndex, filter) {
+  function applyActiveFilter(rowData, regIndex, analystIndex, filter, etapaIndex, gerenteIndex) {
     if (!filter) return rowData;
     return rowData.filter(function (row) {
       if (filter.dim === "reg") return regIndex[row[3]] === filter.value;
@@ -573,6 +668,13 @@
         var isAberto = row[1] === 1 || row[1] === 2;
         return filter.value === "Aberto" ? isAberto : !isAberto;
       }
+      if (filter.dim === "etapa") {
+        if (!etapaIndex) return false;
+        var rawEtapa = etapaIndex[row[7]];
+        var normalized = rawEtapa === ETAPA_NAO_INFORMADA ? rawEtapa : etapaLabel(rawEtapa);
+        return normalized === filter.value;
+      }
+      if (filter.dim === "gerente") return gerenteIndex && gerenteIndex[row[8]] === filter.value;
       return true;
     });
   }
@@ -584,6 +686,31 @@
       activeFilter = { dim: dim, value: value, displayLabel: displayLabel || value };
     }
     renderDashboard();
+  }
+
+  // Deriva qual segmento ("todos"/"aberto"/"encerrado") está ativo a partir do filtro GLOBAL
+  // do painel (mesmo activeFilter usado pelos gráficos) — os botões Todos/Abertos/Finalizados
+  // em Analistas e Gerentes de Relacionamento controlam esse mesmo filtro, então o painel
+  // inteiro se ajusta junto, não só aquele card.
+  function statusGroupSegment() {
+    if (!activeFilter || activeFilter.dim !== "statusgroup") return "todos";
+    return activeFilter.value === "Aberto" ? "aberto" : "encerrado";
+  }
+  function setStatusGroupSegment(seg) {
+    if (seg === "todos") { activeFilter = null; }
+    else { activeFilter = { dim: "statusgroup", value: seg === "aberto" ? "Aberto" : "Encerrado", displayLabel: seg === "aberto" ? "Aberto" : "Encerrado" }; }
+    renderDashboard();
+  }
+  // Markup do seletor Todos/Abertos/Finalizados, reaproveitado em todo card de ranking por
+  // volume (Analistas, Gerentes, Reguladoras, Tipo de Registro, Processos via API). Todas as
+  // instâncias usam a classe "status-filter-group" e disparam o mesmo filtro global.
+  function statusFilterGroupHtml() {
+    var seg = statusGroupSegment();
+    return '<div class="seg-group status-filter-group">' +
+      '<button type="button" class="seg-btn seg-neutral' + (seg === "todos" ? " active" : "") + '" data-filter="todos">Todos os processos</button>' +
+      '<button type="button" class="seg-btn seg-amber' + (seg === "aberto" ? " active" : "") + '" data-filter="aberto">Abertos</button>' +
+      '<button type="button" class="seg-btn seg-green' + (seg === "encerrado" ? " active" : "") + '" data-filter="encerrado">Finalizados</button>' +
+      '</div>';
   }
 
   var fileInput = document.getElementById("fileInput");
@@ -678,7 +805,7 @@
   var showAllRegulators = false;
   var allAnalystEntries = [];
   var showAllAnalysts = false;
-  var analystFilter = "aberto";
+  var allGerenteEntries = [];
   var currentDb = null;
 
   tabNav.querySelectorAll(".tab-btn").forEach(function (btn) {
@@ -994,6 +1121,24 @@
       analystMap[name] = idx;
       return idx;
     }
+    var gerenteIndex = [];
+    var gerenteMap = {};
+    function gerenteIdxFor(name) {
+      if (Object.prototype.hasOwnProperty.call(gerenteMap, name)) return gerenteMap[name];
+      var idx = gerenteIndex.length;
+      gerenteIndex.push(name);
+      gerenteMap[name] = idx;
+      return idx;
+    }
+    var etapaIndex = [];
+    var etapaMap = {};
+    function etapaIdxFor(name) {
+      if (Object.prototype.hasOwnProperty.call(etapaMap, name)) return etapaMap[name];
+      var idx = etapaIndex.length;
+      etapaIndex.push(name);
+      etapaMap[name] = idx;
+      return idx;
+    }
 
     var rowData = [];
     var maxAbertura = null;
@@ -1053,13 +1198,21 @@
         if (!isNaN(dp.getTime())) pagDays = daysSinceEpoch(dp);
       }
 
-      rowData.push([daysSinceEpoch(d), statusCode, origemCode, regIdx, liqDays, analistaIdx, pagDays]);
+      var etapaRaw = norm(r["Atividade atual"]);
+      var etapaIdx = etapaIdxFor(etapaRaw ? etapaLabel(etapaRaw) : ETAPA_NAO_INFORMADA);
+
+      var gerenteRaw = norm(r["Comercial da Conta"]);
+      var gerenteIdx = gerenteIdxFor(gerenteRaw || GERENTE_NAO_INFORMADO);
+
+      rowData.push([daysSinceEpoch(d), statusCode, origemCode, regIdx, liqDays, analistaIdx, pagDays, etapaIdx, gerenteIdx]);
     });
 
-    var totals = computeCumulative(rowData, regIndex, analystIndex, Infinity);
+    var totals = computeCumulative(rowData, regIndex, analystIndex, Infinity, etapaIndex, gerenteIndex);
     totals.rowData = rowData;
     totals.regIndex = regIndex;
     totals.analystIndex = analystIndex;
+    totals.etapaIndex = etapaIndex;
+    totals.gerenteIndex = gerenteIndex;
     totals.asOfDate = maxAbertura ? maxAbertura.toISOString() : null;
     totals.totalSemAbertura = totalSemAbertura;
     return totals;
@@ -1068,31 +1221,51 @@
   // Recalcula todos os indicadores considerando só os sinistros cuja ABERTURA
   // é menor ou igual ao corte informado (cutoffDays = dias desde epoch, ou Infinity p/ tudo).
   // Também calcula o atraso médio (em dias) dos processos atrasados até a data de corte.
-  function computeCumulative(rowData, regIndex, analystIndex, cutoffDays) {
+  function computeCumulative(rowData, regIndex, analystIndex, cutoffDays, etapaIndex, gerenteIndex) {
     var total = 0, manual = 0, api = 0, quiver = 0;
     var aberto = 0, encerrado = 0, emAndamento = 0, atrasado = 0, aprovado = 0, cancelado = 0, rejeitado = 0;
     var byRegTotal = {}, byRegAPI = {}, byAnalistaTotal = {}, byAnalistaAberto = {}, byAnalistaEncerrado = {};
+    var byEtapaTotal = {};
+    var byEtapaAtrasado = {};
+    var byGerenteTotal = {}, byGerenteAberto = {}, byGerenteEncerrado = {};
     var atrasoDiasSoma = 0, atrasoCount = 0;
+    // reguladoras associadas (API_REGULATORS) x não associadas — pedido do Antonio Carlos
+    var assoc = { total: 0, aberto: 0, atrasado: 0 }, naoAssoc = { total: 0, aberto: 0, atrasado: 0 };
 
     rowData.forEach(function (row) {
-      var abDays = row[0], statusCode = row[1], origemCode = row[2], regIdx = row[3], analistaIdx = row[5];
+      var abDays = row[0], statusCode = row[1], origemCode = row[2], regIdx = row[3], analistaIdx = row[5], etapaIdx = row[7], gerenteIdx = row[8];
       if (abDays > cutoffDays) return;
       total++;
       if (origemCode === 0) api++; else if (origemCode === 1) quiver++; else manual++;
       var regName = regIndex[regIdx];
       byRegTotal[regName] = (byRegTotal[regName] || 0) + 1;
       if (origemCode === 0) byRegAPI[regName] = (byRegAPI[regName] || 0) + 1;
+      var isAssoc = API_REGULATORS.indexOf(regName) !== -1;
+      var assocBucket = isAssoc ? assoc : naoAssoc;
+      assocBucket.total++;
 
       var isAberto = statusCode === 1 || statusCode === 2;
+      if (isAberto) assocBucket.aberto++;
       if (analystIndex && analistaIdx !== undefined) {
         var analistaName = analystIndex[analistaIdx];
         byAnalistaTotal[analistaName] = (byAnalistaTotal[analistaName] || 0) + 1;
         if (isAberto) byAnalistaAberto[analistaName] = (byAnalistaAberto[analistaName] || 0) + 1;
         else byAnalistaEncerrado[analistaName] = (byAnalistaEncerrado[analistaName] || 0) + 1;
       }
+      if (etapaIndex && etapaIdx !== undefined) {
+        var etapaName = etapaIndex[etapaIdx];
+        byEtapaTotal[etapaName] = (byEtapaTotal[etapaName] || 0) + 1;
+        if (statusCode === 1) byEtapaAtrasado[etapaName] = (byEtapaAtrasado[etapaName] || 0) + 1;
+      }
+      if (gerenteIndex && gerenteIdx !== undefined) {
+        var gerenteName = gerenteIndex[gerenteIdx];
+        byGerenteTotal[gerenteName] = (byGerenteTotal[gerenteName] || 0) + 1;
+        if (isAberto) byGerenteAberto[gerenteName] = (byGerenteAberto[gerenteName] || 0) + 1;
+        else byGerenteEncerrado[gerenteName] = (byGerenteEncerrado[gerenteName] || 0) + 1;
+      }
 
       if (statusCode === 1) {
-        atrasado++; aberto++;
+        atrasado++; aberto++; assocBucket.atrasado++;
         if (isFinite(cutoffDays)) { atrasoDiasSoma += (cutoffDays - abDays); atrasoCount++; }
       }
       else if (statusCode === 2) { emAndamento++; aberto++; }
@@ -1107,7 +1280,11 @@
       aprovado: aprovado, cancelado: cancelado, rejeitado: rejeitado,
       byRegTotal: byRegTotal, byRegAPI: byRegAPI,
       byAnalistaTotal: byAnalistaTotal, byAnalistaAberto: byAnalistaAberto, byAnalistaEncerrado: byAnalistaEncerrado,
+      byEtapaTotal: byEtapaTotal,
+      byEtapaAtrasado: byEtapaAtrasado,
+      byGerenteTotal: byGerenteTotal, byGerenteAberto: byGerenteAberto, byGerenteEncerrado: byGerenteEncerrado,
       atrasoMedioDias: atrasoCount ? Math.round(atrasoDiasSoma / atrasoCount) : null,
+      assoc: assoc, naoAssoc: naoAssoc,
     };
   }
 
@@ -1115,6 +1292,7 @@
   // independente da data de corte escolhida.
   var GO_LIVE_DATE = new Date("2026-09-23T12:00:00");
   var SHOW_TREND_CARD = false; // card "Evolução desde o Go-Live" ocultado a pedido — mude para true para reativar
+  var SHOW_ASSOC_CARD = false; // card "Reguladoras associadas x não associadas" ocultado a pedido (27/10) — mude para true para reativar
 
   // Reconstrói o estado REAL do processo em uma data passada, usando a data de
   // liquidação (quando existir): um processo só conta como "encerrado" na data de
@@ -1455,14 +1633,14 @@
     if (sourceDoc) {
       cutoffDate = dateFilter.value ? new Date(dateFilter.value + "T12:00:00") : dateFromDays(Math.max.apply(null, sourceDoc.data.rowData.map(function (r) { return r[0]; })));
       var curDays = daysSinceEpoch(cutoffDate);
-      var effectiveRowData = applyActiveFilter(sourceDoc.data.rowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, activeFilter);
+      var effectiveRowData = applyActiveFilter(sourceDoc.data.rowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, activeFilter, sourceDoc.data.etapaIndex, sourceDoc.data.gerenteIndex);
       var operacaoRowData = applyDateRangeMode(effectiveRowData, caseDateMode, cutoffDate);
-      current = computeCumulative(operacaoRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, curDays);
+      current = computeCumulative(operacaoRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, curDays, sourceDoc.data.etapaIndex, sourceDoc.data.gerenteIndex);
 
       var mode = compareSelect.value || "1d";
       previousCutoffDate = mode === "7d" ? daysBack(cutoffDate, 7) : mode === "30d" ? monthsBack(cutoffDate, 1) : mode === "365d" ? monthsBack(cutoffDate, 12) : daysBack(cutoffDate, 1);
       var prevDays = daysSinceEpoch(previousCutoffDate);
-      previous = computeCumulative(operacaoRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, prevDays);
+      previous = computeCumulative(operacaoRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, prevDays, sourceDoc.data.etapaIndex, sourceDoc.data.gerenteIndex);
 
       filterExplain.style.display = "block";
       filterExplain.textContent = "Mostrando sinistros com abertura até " + fmtDate(cutoffDate) +
@@ -1518,11 +1696,18 @@
     // o mesmo percentual, só complementa com tendência e atraso médio
     var summaryText = buildSummary(current, previous, showAlert);
 
+    // detalhamento associada x não associada vai no tooltip "?" do card (clique pra ver),
+    // em vez de uma linha sempre visível — mantém o card limpo, igual antes dessa info existir
+    var abertoAssocPct = current.aberto > 0 ? Math.round((current.assoc.aberto / current.aberto) * 100) : 0;
+    var atrasadoAssocPct = current.atrasado > 0 ? Math.round((current.assoc.atrasado / current.atrasado) * 100) : 0;
+    var abertoTip = current.aberto > 0 ? ('Dos processos em aberto, ' + abertoAssocPct + '% são de reguladora associada e ' + (100 - abertoAssocPct) + '% de não associada.') : null;
+    var atrasadoTip = current.atrasado > 0 ? ('Dos processos atrasados, ' + atrasadoAssocPct + '% são de reguladora associada e ' + (100 - atrasadoAssocPct) + '% de não associada.') : null;
+
     // KPI cards
     html += '<div class="kpi-grid">';
     html += kpiCard("Total de processos", current.total, previous && previous.total, null, false, "📁", COLORS.navy);
-    html += kpiCard("Em aberto", current.aberto, previous && previous.aberto, null, false, "📂", COLORS.amber);
-    html += kpiCard("Atrasados", current.atrasado, previous && previous.atrasado, true, false, "⏱", COLORS.coral);
+    html += kpiCard("Em aberto", current.aberto, previous && previous.aberto, null, false, "📂", COLORS.amber, abertoTip);
+    html += kpiCard("Atrasados", current.atrasado, previous && previous.atrasado, true, false, "⏱", COLORS.coral, atrasadoTip);
     html += kpiCard("Encerrados", current.encerrado, previous && previous.encerrado, false, false, "✅", COLORS.green);
     html += kpiCard("Atraso médio (dias)", current.atrasoMedioDias, previous && previous.atrasoMedioDias, true, true, "📅", COLORS.maroon, "Média de dias em atraso dos processos que estão atrasados HOJE (na data de corte escolhida), contando a partir da data de abertura de cada um.");
     html += "</div>";
@@ -1553,24 +1738,63 @@
     html += '<div class="chart-card"><h3>STATUS DETALHADO DO PROCESSO <span class="hint-click">💡 clique no gráfico para filtrar</span></h3><div id="chart-detalhado"></div></div>';
     html += '</div>';
 
+    html += '<div class="section-title">Processos por etapa</div>';
+    html += '<div class="chart-card etapa-card"><h3>ATIVIDADE ATUAL <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' +
+      '<div class="etapa-group-label etapa-group-andamento">🔄 Em andamento</div>' +
+      '<div id="chart-etapa-andamento"></div>' +
+      '<div class="etapa-group-label etapa-group-finalizado">✅ Finalizado</div>' +
+      '<div id="chart-etapa-finalizado"></div>' +
+      '</div>';
+
+    html += '<div class="chart-card" style="margin-bottom:16px;"><h3>⚠️ ONDE ESTÃO OS ATRASADOS <span class="hint-click">💡 clique no gráfico para filtrar</span></h3><div id="chart-etapa-atraso"></div></div>';
+
     html += '<div class="section-title">Analistas</div>';
     html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>ANALISTAS — VOLUME TOTAL <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' +
       '<div style="display:flex; align-items:center; gap:10px;">' +
-      '<div class="seg-group" id="analystFilterGroup">' +
-      '<button type="button" class="seg-btn seg-neutral' + (analystFilter === "todos" ? " active" : "") + '" data-filter="todos">Todos os processos</button>' +
-      '<button type="button" class="seg-btn seg-amber' + (analystFilter === "aberto" ? " active" : "") + '" data-filter="aberto">Abertos</button>' +
-      '<button type="button" class="seg-btn seg-green' + (analystFilter === "encerrado" ? " active" : "") + '" data-filter="encerrado">Finalizados</button>' +
-      '</div>' +
+      statusFilterGroupHtml() +
       '<button class="secondary" id="analystToggleBtn" style="display:none; padding:5px 12px; font-size:11.5px;"></button>' +
       '</div></div><div id="chart-analista"></div></div>';
 
+    html += '<div class="section-title">Gerentes de Relacionamento</div>';
+    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>GERENTES DE RELACIONAMENTO — VOLUME TOTAL <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' +
+      statusFilterGroupHtml() +
+      '</div><div id="chart-gerente"></div></div>';
+
     html += '<div class="section-title">Reguladoras</div>';
-    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>REGULADORAS — VOLUME TOTAL <span class="hint-click">💡 clique no gráfico para filtrar</span></h3><button class="secondary" id="regToggleBtn" style="display:none; padding:5px 12px; font-size:11.5px;"></button></div><div id="chart-top"></div><div style="margin-top:10px;"><span class="pill-outline">⚡ Reguladora com integração via API (Associada)</span></div></div>';
+    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>REGULADORAS — VOLUME TOTAL <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' +
+      '<div style="display:flex; align-items:center; gap:10px;">' +
+      statusFilterGroupHtml() +
+      '<button class="secondary" id="regToggleBtn" style="display:none; padding:5px 12px; font-size:11.5px;"></button>' +
+      '</div></div><div id="chart-top"></div><div style="margin-top:10px;"><span class="pill-outline">⚡ Reguladora com integração via API (Associada)</span></div></div>';
+
+    // reguladoras associadas x não associadas — pedido do Antonio Carlos na reunião de 23/10;
+    // fica junto dos demais dados de reguladoras, logo após o ranking por volume.
+    // Ocultado a pedido em 27/10 (SHOW_ASSOC_CARD acima) — cálculo e gráfico continuam
+    // prontos, só não aparecem.
+    if (SHOW_ASSOC_CARD) {
+      var totalBase = current.assoc.total + current.naoAssoc.total;
+      var totalAssocPct = totalBase > 0 ? Math.round((current.assoc.total / totalBase) * 100) : 0;
+      var totalNaoAssocPct = totalBase > 0 ? 100 - totalAssocPct : 0;
+      html += '<div class="card assoc-breakdown-card">' +
+        '<h3>Reguladoras associadas x não associadas</h3>' +
+        '<div class="assoc-total-highlight">' +
+        '<div class="assoc-total-stat"><span class="n" style="color:' + COLORS.navy + ';">' + fmt(current.assoc.total) + '</span><span class="l">Associadas · Total geral (' + totalAssocPct + '%)</span></div>' +
+        '<div class="assoc-total-stat"><span class="n" style="color:' + COLORS.gray + ';">' + fmt(current.naoAssoc.total) + '</span><span class="l">Não associadas · Total geral (' + totalNaoAssocPct + '%)</span></div>' +
+        '</div>' +
+        '<div class="assoc-group-label">Por status</div>' +
+        '<div id="chart-assoc"></div>' +
+        '<div class="assoc-legend">' +
+        '<span class="item"><span class="dot" style="background:' + COLORS.navy + ';"></span>Associadas</span>' +
+        '<span class="item"><span class="dot" style="background:' + COLORS.gray + ';"></span>Não associadas</span>' +
+        '</div>' +
+        '<div class="pill-outline">⚡ Associadas: Dórica, Fox, L Perna, Serra & Company</div>' +
+        '</div>';
+    }
 
     html += '<div class="section-title">Composição da base</div>';
     html += '<div class="chart-grid">';
-    html += '<div class="chart-card"><h3>TIPO DE REGISTRO <span class="hint-click">💡 clique no gráfico para filtrar</span></h3><div id="chart-tipo"></div></div>';
-    html += '<div class="chart-card"><h3>PROCESSOS VIA API (POR REGULADORA) <span class="hint-click">💡 clique no gráfico para filtrar</span></h3><div id="chart-api"></div></div>';
+    html += '<div class="chart-card"><div class="chart-card-head"><h3>TIPO DE REGISTRO <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' + statusFilterGroupHtml() + '</div><div id="chart-tipo"></div></div>';
+    html += '<div class="chart-card"><div class="chart-card-head"><h3>PROCESSOS VIA API (POR REGULADORA) <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' + statusFilterGroupHtml() + '</div><div id="chart-api"></div></div>';
     html += '</div>';
 
     // tendência — calculada por fatiamento de data, não depende de múltiplos uploads
@@ -1616,15 +1840,11 @@
       });
     }
 
-    var analystFilterGroup = document.getElementById("analystFilterGroup");
-    if (analystFilterGroup) {
-      analystFilterGroup.querySelectorAll("[data-filter]").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          analystFilter = btn.getAttribute("data-filter");
-          renderDashboard();
-        });
+    document.querySelectorAll(".status-filter-group [data-filter]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        setStatusGroupSegment(btn.getAttribute("data-filter"));
       });
-    }
+    });
 
     document.querySelectorAll("[data-del-id]").forEach(function (btn) {
       var confirming = false;
@@ -1696,6 +1916,57 @@
       { label: "Rejeitado", value: current.rejeitado, color: COLORS.maroon },
     ], { horizontal: false, groupSplit: 2, groupLabels: ["EM ABERTO", "ENCERRADO"], filterDim: "status", onClick: function (label) { setActiveFilter("status", label, label); } });
 
+    if (SHOW_ASSOC_CARD) {
+      drawAssocChart("#chart-assoc", [
+        { label: "Em aberto", assoc: current.assoc.aberto, naoAssoc: current.naoAssoc.aberto },
+        { label: "Atrasados", assoc: current.assoc.atrasado, naoAssoc: current.naoAssoc.atrasado },
+      ]);
+    }
+
+    // Reagrupa por rótulo normalizado (cobre dados salvos antes da normalização existir) e
+    // ordena pela SEQUÊNCIA DO FLUXO (ETAPA_ORDEM), não por quantidade — mostra o avanço
+    // real dos processos etapa a etapa.
+    var byEtapaNormalizado = {};
+    Object.keys(current.byEtapaTotal || {}).forEach(function (k) {
+      var label = k === ETAPA_NAO_INFORMADA ? k : etapaLabel(k);
+      byEtapaNormalizado[label] = (byEtapaNormalizado[label] || 0) + current.byEtapaTotal[k];
+    });
+    var etapaEntries = Object.keys(byEtapaNormalizado).map(function (k) {
+      return { label: k, value: byEtapaNormalizado[k] };
+    });
+    // "Em andamento" segue a sequência do fluxo (ETAPA_ORDEM); "Finalizado" ordena por quantidade
+    var etapaAndamento = etapaEntries.filter(function (e) { return ETAPA_FINALIZADAS.indexOf(e.label) === -1; })
+      .sort(function (a, b) {
+        if (a.label === ETAPA_NAO_INFORMADA) return 1;
+        if (b.label === ETAPA_NAO_INFORMADA) return -1;
+        var ia = ETAPA_ORDEM.indexOf(a.label), ib = ETAPA_ORDEM.indexOf(b.label);
+        if (ia === -1 && ib === -1) return a.label.localeCompare(b.label);
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+      });
+    var etapaFinalizado = etapaEntries.filter(function (e) { return ETAPA_FINALIZADAS.indexOf(e.label) !== -1; })
+      .sort(function (a, b) { return b.value - a.value; });
+    var etapaColors = gradient(etapaAndamento.length, COLORS.navy, COLORS.lightblue);
+    etapaAndamento.forEach(function (e, i) { e.color = e.label === ETAPA_NAO_INFORMADA ? COLORS.amber : etapaColors[i]; });
+    etapaFinalizado.forEach(function (e) { e.color = COLORS.green; });
+    drawBars("#chart-etapa-andamento", etapaAndamento, { horizontal: true, filterDim: "etapa", onClick: function (label) { setActiveFilter("etapa", label, label); } });
+    drawBars("#chart-etapa-finalizado", etapaFinalizado, { horizontal: true, filterDim: "etapa", onClick: function (label) { setActiveFilter("etapa", label, label); } });
+
+    // "Onde estão os atrasados" — dos processos ATRASADOS, em qual etapa cada um está
+    // parado. Ordenado por quantidade (maior gargalo primeiro), não pela sequência do fluxo.
+    var byEtapaAtrasoNormalizado = {};
+    Object.keys(current.byEtapaAtrasado || {}).forEach(function (k) {
+      var label = k === ETAPA_NAO_INFORMADA ? k : etapaLabel(k);
+      byEtapaAtrasoNormalizado[label] = (byEtapaAtrasoNormalizado[label] || 0) + current.byEtapaAtrasado[k];
+    });
+    var etapaAtrasoEntries = Object.keys(byEtapaAtrasoNormalizado)
+      .filter(function (k) { return ETAPA_FINALIZADAS.indexOf(k) === -1; }) // processo já encerrado não conta como gargalo
+      .map(function (k) {
+        return { label: k, value: byEtapaAtrasoNormalizado[k], color: COLORS.coral };
+      }).sort(function (a, b) { return b.value - a.value; });
+    drawBars("#chart-etapa-atraso", etapaAtrasoEntries, { horizontal: true, filterDim: "etapa", onClick: function (label) { setActiveFilter("etapa", label, label); } });
+
     allRegulatorEntries = Object.keys(current.byRegTotal || {}).map(function (k) {
       return { label: k, value: current.byRegTotal[k] };
     }).sort(sortRegulators);
@@ -1704,9 +1975,9 @@
     drawRegulatorChart();
 
     allAnalystEntries = (function () {
-      var source = analystFilter === "aberto" ? current.byAnalistaAberto
-        : analystFilter === "encerrado" ? current.byAnalistaEncerrado
-        : current.byAnalistaTotal;
+      // current já reflete o filtro global (ver effectiveRowData); byAnalistaTotal sempre
+      // serve, seja o filtro "todos", "aberto" ou "encerrado"
+      var source = current.byAnalistaTotal;
       var raw = Object.assign({}, source || {});
       var sistemaBreakdown = {};
       var sistemaTotal = 0;
@@ -1737,6 +2008,18 @@
     var analystColors = gradient(allAnalystEntries.length, COLORS.navy2, "#CFE5F7");
     allAnalystEntries.forEach(function (e, i) { e.color = (e.label === ANALISTA_NAO_INFORMADO || e.label === CONTA_DE_SISTEMA) ? COLORS.amber : analystColors[i]; });
     drawAnalystChart();
+
+    allGerenteEntries = (function () {
+      var source = current.byGerenteTotal;
+      return Object.keys(source || {}).map(function (k) { return { label: k, value: source[k] }; });
+    })().sort(function (a, b) {
+      if (a.label === GERENTE_NAO_INFORMADO) return 1;
+      if (b.label === GERENTE_NAO_INFORMADO) return -1;
+      return b.value - a.value;
+    });
+    var gerenteColors = gradient(allGerenteEntries.length, COLORS.teal, "#CFE5F7");
+    allGerenteEntries.forEach(function (e, i) { e.color = e.label === GERENTE_NAO_INFORMADO ? COLORS.amber : gerenteColors[i]; });
+    drawBars("#chart-gerente", allGerenteEntries, { horizontal: true, filterDim: "gerente", onClick: function (label) { setActiveFilter("gerente", label, label); } });
 
     if (sourceDoc && SHOW_TREND_CARD) {
       if (cutoffDate < GO_LIVE_DATE) {
@@ -1818,6 +2101,44 @@
     var node = d3.select(sel).node();
     var w = node && node.clientWidth ? node.clientWidth : 420;
     return Math.max(260, w);
+  }
+
+  // Grafico de barras horizontais agrupadas (Associadas x Nao associadas) — uma linha
+  // por categoria (Total geral, Em aberto, Atrasados), cada uma com 2 barras lado a lado.
+  function drawAssocChart(sel, rows) {
+    var container = d3.select(sel);
+    container.selectAll("*").remove();
+    var W = chartWidth(sel);
+    var margin = { top: 10, right: 46, bottom: 10, left: 110 };
+    var rowH = 56, groupGap = 14;
+    var innerW = W - margin.left - margin.right;
+    var H = rows.length * rowH + margin.top + margin.bottom;
+    var svg = container.append("svg").attr("viewBox", "0 0 " + W + " " + H);
+    addSrTitle(svg, rows.map(function (r) { return r.label + ": associadas " + fmt(r.assoc) + ", não associadas " + fmt(r.naoAssoc); }).join("; "));
+    var g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    var maxVal = d3.max(rows, function (r) { return Math.max(r.assoc, r.naoAssoc); }) || 1;
+    var x = d3.scaleLinear().domain([0, maxVal]).range([0, innerW]);
+    var barH = (rowH - groupGap) / 2 - 3;
+
+    rows.forEach(function (r, i) {
+      var rowY = i * rowH;
+      g.append("text").attr("class", "axis-cat").attr("x", -10).attr("y", rowY + rowH / 2 + 4)
+        .attr("text-anchor", "end").text(r.label);
+
+      [{ val: r.assoc, color: COLORS.navy, y: rowY, key: "assoc" },
+       { val: r.naoAssoc, color: COLORS.gray, y: rowY + barH + 6, key: "naoAssoc" }].forEach(function (b, bi) {
+        var rect = g.append("rect")
+          .attr("x", 0).attr("y", b.y).attr("height", barH).attr("width", 0)
+          .attr("rx", 3).attr("fill", b.color);
+        rect.append("title").text(r.label + " — " + (b.key === "assoc" ? "Associadas" : "Não associadas") + ": " + fmt(b.val));
+        rect.transition().duration(650).delay(i * 70 + bi * 60).ease(d3.easeCubicOut)
+          .attr("width", x(b.val));
+        g.append("text").attr("class", "bar-label").attr("y", b.y + barH / 2 + 4)
+          .style("opacity", 0).text(fmt(b.val))
+          .transition().duration(300).delay(i * 70 + bi * 60 + 500).style("opacity", 1)
+          .attr("x", x(b.val) + 8);
+      });
+    });
   }
 
   function addSrTitle(svg, text) {
