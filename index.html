@@ -399,6 +399,27 @@
     padding: 4px 11px; font-size: 11.5px; font-weight: 700; cursor: pointer;
   }
   .active-filter-chip button:hover { background: rgba(255,255,255,.3); }
+  .detail-table-card { margin-bottom: 20px; }
+  .detail-table-empty { font-size: 12.5px; color: var(--color-fg-muted); padding: 4px; }
+  table.detail-table { width: 100%; min-width: 700px; border-collapse: collapse; font-size: 12px; }
+  table.detail-table th {
+    text-align: left; padding: 8px 10px; font-size: 10.5px; font-weight: 700; color: var(--color-fg-muted);
+    text-transform: uppercase; letter-spacing: .02em; border-bottom: 2px solid var(--color-border-line); white-space: nowrap;
+  }
+  table.detail-table th.sortable-th { cursor: pointer; user-select: none; }
+  table.detail-table th.sortable-th:hover { color: var(--color-fg); }
+  table.detail-table td { padding: 8px 10px; border-bottom: 1px solid var(--color-border-line); color: var(--color-fg); white-space: nowrap; }
+  table.detail-table tr:last-child td { border-bottom: none; }
+  table.detail-table tr:hover td { background: var(--color-bg); }
+  .detail-table-note { font-size: 11px; color: var(--color-fg-muted); margin-top: 8px; font-style: italic; }
+  .detail-table-pagination {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    margin-top: 10px; font-size: 11.5px; color: var(--color-fg-muted);
+  }
+  .detail-page-btns { display: flex; align-items: center; gap: 10px; }
+  .detail-page-label { font-size: 11.5px; color: var(--color-fg-muted); white-space: nowrap; }
+  .detail-page-btns button.secondary { padding: 5px 12px; font-size: 11.5px; }
+  .detail-page-btns button.secondary:disabled { opacity: .4; cursor: default; }
   .chart-card .hint-click { font-size: 10px; color: var(--color-fg-muted); font-weight: 500; margin-left: 6px; }
   .clickable-el { cursor: pointer; }
   .clickable-el:hover { opacity: .82; }
@@ -679,12 +700,139 @@
     });
   }
 
+  var DETAIL_PAGE_SIZE = 50;
+  var detailPage = 0; // página atual da tabela de detalhe (0-based); reseta ao trocar filtro/ordenação
+  var detailSortCol = null; // chave da coluna ordenada na tabela de detalhe (ver COLS em buildDetailTable)
+  var detailSortDir = "asc"; // "asc" | "desc" — alterna ao clicar de novo na mesma coluna
+
+  function parseDetailDate(s) {
+    var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1]).getTime();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      var t = Date.parse(s);
+      if (!isNaN(t)) return t;
+    }
+    return null;
+  }
+  // Compara duas strings de exibição da tabela de detalhe tentando, nesta ordem, data,
+  // depois número (removendo separadores comuns de ID como ./–, comparando por dígito pra
+  // não perder precisão em CNPJ de 14 dígitos) e por fim texto, de forma alfabética.
+  function detailSmartCompare(a, b) {
+    var sa = (a === null || a === undefined) ? "" : String(a).trim();
+    var sb = (b === null || b === undefined) ? "" : String(b).trim();
+    if (sa === "" && sb === "") return 0;
+    if (sa === "") return 1;
+    if (sb === "") return -1;
+
+    var da = parseDetailDate(sa), db = parseDetailDate(sb);
+    if (da !== null && db !== null) return da - db;
+
+    var digitsA = sa.replace(/[.\-\/\s]/g, "");
+    var digitsB = sb.replace(/[.\-\/\s]/g, "");
+    if (/^\d+$/.test(digitsA) && /^\d+$/.test(digitsB)) {
+      var maxLen = Math.max(digitsA.length, digitsB.length);
+      var pa = digitsA.padStart(maxLen, "0");
+      var pb = digitsB.padStart(maxLen, "0");
+      if (pa !== pb) return pa < pb ? -1 : 1;
+      return 0;
+    }
+
+    return sa.localeCompare(sb, "pt-BR", { numeric: true, sensitivity: "base" });
+  }
+
+  // Monta a tabela de processos que aparece abaixo do chip de filtro ativo. Lê os dados de
+  // "detail" (documento separado do snapshot principal, ver doSave/loadAndRender) — se não
+  // existir (snapshot antigo, ou o salvamento do detalhe falhou), mostra um aviso em vez de
+  // quebrar.
+  function buildDetailTable(rows, regIndex, analystIndex, gerenteIndex, detail) {
+    if (!detail) {
+      return '<div class="card detail-table-card"><div class="detail-table-empty">Dados de detalhe (Processo, Cliente, CNPJ etc.) não disponíveis para este snapshot.</div></div>';
+    }
+    if (!rows.length) {
+      return '<div class="card detail-table-card"><div class="detail-table-empty">Nenhum processo neste recorte.</div></div>';
+    }
+
+    // resolve os campos de exibição de cada linha ANTES de ordenar, pra ordenar pelo
+    // valor que aparece na tela (nome, cnpj etc.), não pelo índice interno
+    var COLS = [
+      { key: "processo", label: "Processo" },
+      { key: "cliente", label: "Nome do Cliente" },
+      { key: "cnpj", label: "CNPJ" },
+      { key: "apolice", label: "Número da Apólice" },
+      { key: "numSinistro", label: "Nº Processo na Reguladora" },
+      { key: "reguladora", label: "Reguladora" },
+      { key: "seguradora", label: "Seguradora" },
+      { key: "analista", label: "Analista" },
+      { key: "gerente", label: "Comercial da Conta" },
+    ];
+    var resolved = rows.map(function (row) {
+      var d = detail.detailRows ? detail.detailRows[row[9]] : null;
+      var cliente = (d && detail.clienteIndex) ? detail.clienteIndex[d[0]] : null;
+      var seguradoraName = (d && detail.seguradoraIndex) ? detail.seguradoraIndex[d[1]] : null;
+      return {
+        processo: d ? d[2] : "",
+        cliente: (cliente && cliente[1]) || "",
+        cnpj: (cliente && cliente[0]) || "",
+        numSinistro: d ? d[3] : "",
+        apolice: d ? (d[4] || "") : "",
+        reguladora: regIndex[row[3]] || "",
+        seguradora: seguradoraName || "",
+        analista: formatAnalystName(analystIndex[row[5]]),
+        gerente: gerenteIndex ? (gerenteIndex[row[8]] || "") : "",
+      };
+    });
+
+    if (detailSortCol) {
+      var dir = detailSortDir === "desc" ? -1 : 1;
+      var key = detailSortCol;
+      resolved.sort(function (a, b) { return detailSmartCompare(a[key], b[key]) * dir; });
+    }
+
+    var totalPages = Math.max(1, Math.ceil(resolved.length / DETAIL_PAGE_SIZE));
+    if (detailPage >= totalPages) detailPage = totalPages - 1;
+    if (detailPage < 0) detailPage = 0;
+    var pageStart = detailPage * DETAIL_PAGE_SIZE;
+    var shown = resolved.slice(pageStart, pageStart + DETAIL_PAGE_SIZE);
+
+    var html = '<div class="card detail-table-card">';
+    html += '<div class="table-scroll"><table class="detail-table"><thead><tr>';
+    COLS.forEach(function (c) {
+      var arrow = detailSortCol === c.key ? (detailSortDir === "desc" ? " ▼" : " ▲") : "";
+      html += '<th class="sortable-th" data-sort-key="' + c.key + '" title="Clique para ordenar">' + c.label + arrow + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+    shown.forEach(function (r) {
+      html += '<tr>' +
+        '<td>' + (r.processo || "—") + '</td>' +
+        '<td>' + (r.cliente || "—") + '</td>' +
+        '<td>' + (r.cnpj || "—") + '</td>' +
+        '<td>' + (r.apolice || "—") + '</td>' +
+        '<td>' + (r.numSinistro || "—") + '</td>' +
+        '<td>' + (r.reguladora || "—") + '</td>' +
+        '<td>' + (r.seguradora || "—") + '</td>' +
+        '<td>' + (r.analista || "—") + '</td>' +
+        '<td>' + (r.gerente || "—") + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div>';
+    html += '<div class="detail-table-pagination">' +
+      '<span>Mostrando ' + fmt(pageStart + 1) + '–' + fmt(Math.min(pageStart + DETAIL_PAGE_SIZE, resolved.length)) + ' de ' + fmt(resolved.length) + ' processos</span>' +
+      '<div class="detail-page-btns">' +
+      '<button type="button" class="secondary" id="detailPrevBtn"' + (detailPage === 0 ? " disabled" : "") + '>‹ Anterior</button>' +
+      '<span class="detail-page-label">Página ' + (detailPage + 1) + ' de ' + totalPages + '</span>' +
+      '<button type="button" class="secondary" id="detailNextBtn"' + (detailPage >= totalPages - 1 ? " disabled" : "") + '>Próxima ›</button>' +
+      '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   function setActiveFilter(dim, value, displayLabel) {
     if (activeFilter && activeFilter.dim === dim && activeFilter.value === value) {
       activeFilter = null; // clicar de novo no mesmo item remove o filtro
     } else {
       activeFilter = { dim: dim, value: value, displayLabel: displayLabel || value };
     }
+    detailPage = 0; // volta pra primeira pagina da tabela de detalhe ao trocar de filtro
     renderDashboard();
   }
 
@@ -801,6 +949,7 @@
   var pendingRows = null;
   var allDocs = [];
   var sourceDoc = null; // upload mais recente com dados linha-a-linha (rowData), base de todo o corte por data
+  var sourceDetail = null; // dados de detalhe (tabela de processos) correspondentes a sourceDoc, carregados a parte
   var allRegulatorEntries = [];
   var showAllRegulators = false;
   var allAnalystEntries = [];
@@ -1009,15 +1158,46 @@
   processBtn.addEventListener("click", processAndSave);
 
   function doSave(indicators, label, db) {
-    var payload = Object.assign({}, indicators, {
+    var uploadedAt = new Date().toISOString();
+    // dados de detalhe (clique para listar processos) vão num documento SEPARADO do
+    // snapshot principal — numa tentativa anterior, juntar tudo num só documento estourou
+    // o limite de armazenamento. O painel principal continua pequeno e sempre confiável;
+    // se o documento de detalhe falhar ao salvar, só a tabela de processos fica indisponível
+    // pra esse snapshot, o resto do painel funciona normalmente.
+    var detailRows = indicators.detailRows;
+    var clienteIndex = indicators.clienteIndex;
+    var seguradoraIndex = indicators.seguradoraIndex;
+    var mainPayload = Object.assign({}, indicators, {
       label: label,
-      uploadedAt: new Date().toISOString(),
+      uploadedAt: uploadedAt,
     });
-    db.collection("snapshots").add(payload).then(function () {
-      setStatus("✓ Snapshot \"" + label + "\" salvo e painel atualizado.", "ok");
-      uploadCard.classList.add("collapsed");
-      dateFilter.value = ""; // volta a usar a data de abertura mais recente do novo upload
-      loadAndRender(db);
+    delete mainPayload.detailRows;
+    delete mainPayload.clienteIndex;
+    delete mainPayload.seguradoraIndex;
+
+    db.collection("snapshots").add(mainPayload).then(function (mainDoc) {
+      console.log("[detalhe] snapshot principal salvo, retorno do add():", mainDoc, "| mainDoc.id =", mainDoc && mainDoc.id);
+      var detailPayload = {
+        mainSnapshotId: mainDoc && mainDoc.id,
+        uploadedAt: uploadedAt,
+        detailRows: detailRows,
+        clienteIndex: clienteIndex,
+        seguradoraIndex: seguradoraIndex,
+      };
+      // espera o documento de detalhe terminar de salvar (sucesso ou falha) ANTES de
+      // recarregar — chamar loadAndRender antes disso criava uma corrida: a releitura
+      // podia rodar antes do documento de detalhe existir de verdade no banco, fazendo
+      // a tabela aparecer como "não disponível" mesmo quando o salvamento ia dar certo.
+      return db.collection("snapshot_details").add(detailPayload).then(function (detailDoc) {
+        console.log("[detalhe] documento de detalhe salvo com sucesso, retorno do add():", detailDoc, "| payload.uploadedAt usado para casar depois:", uploadedAt);
+      }).catch(function (err) {
+        console.error("[detalhe] ERRO ao salvar os dados de detalhe (tabela de processos ficará indisponível para este snapshot):", err);
+      }).then(function () {
+        setStatus("✓ Snapshot \"" + label + "\" salvo e painel atualizado.", "ok");
+        uploadCard.classList.add("collapsed");
+        dateFilter.value = ""; // volta a usar a data de abertura mais recente do novo upload
+        loadAndRender(db);
+      });
     }).catch(function (err) {
       setStatus("Erro ao salvar: " + (err && err.message ? err.message : err), "err");
       processBtn.disabled = false;
@@ -1139,8 +1319,32 @@
       etapaMap[name] = idx;
       return idx;
     }
+    // Seguradora e Cliente (CNPJ + Razão Social) — catalogos deduplicados, só usados pela
+    // tabela de detalhe (clique para listar processos). Ficam num documento SEPARADO do
+    // snapshot principal (ver saveDetailData), pra não repetir o problema de armazenamento
+    // de uma tentativa anterior.
+    var seguradoraIndex = [];
+    var seguradoraMap = {};
+    function seguradoraIdxFor(name) {
+      if (Object.prototype.hasOwnProperty.call(seguradoraMap, name)) return seguradoraMap[name];
+      var idx = seguradoraIndex.length;
+      seguradoraIndex.push(name);
+      seguradoraMap[name] = idx;
+      return idx;
+    }
+    var clienteIndex = [];
+    var clienteMap = {};
+    function clienteIdxFor(cnpj, razaoSocial) {
+      var key = cnpj + "|" + razaoSocial;
+      if (Object.prototype.hasOwnProperty.call(clienteMap, key)) return clienteMap[key];
+      var idx = clienteIndex.length;
+      clienteIndex.push([cnpj, razaoSocial]);
+      clienteMap[key] = idx;
+      return idx;
+    }
 
     var rowData = [];
+    var detailRows = []; // alinhado por índice com rowData (ver rowIdx no final de cada linha)
     var maxAbertura = null;
     var totalSemAbertura = 0;
 
@@ -1204,7 +1408,20 @@
       var gerenteRaw = norm(r["Comercial da Conta"]);
       var gerenteIdx = gerenteIdxFor(gerenteRaw || GERENTE_NAO_INFORMADO);
 
-      rowData.push([daysSinceEpoch(d), statusCode, origemCode, regIdx, liqDays, analistaIdx, pagDays, etapaIdx, gerenteIdx]);
+      // dados de detalhe (só para a tabela de processos ao filtrar) — ficam no array
+      // SEPARADO detailRows, alinhado por índice com rowData via rowIdx
+      var seguradoraRaw = norm(r["Seguradora"]);
+      var seguradoraIdx = seguradoraIdxFor(seguradoraRaw || NAO_INFORMADA);
+      var cnpjRaw = norm(r["CNPJ do cliente"]);
+      var razaoSocialRaw = norm(r["Razão social do cliente"]);
+      var clienteIdx = clienteIdxFor(cnpjRaw, razaoSocialRaw);
+      var processoRaw = norm(r["Processo"] || r["#Processo"]);
+      var numSinistroRegRaw = norm(r["Número do sinistro Reguladora"]);
+      var apoliceRaw = norm(r["Número da apólice"]);
+      var rowIdx = detailRows.length;
+      detailRows.push([clienteIdx, seguradoraIdx, processoRaw, numSinistroRegRaw, apoliceRaw]);
+
+      rowData.push([daysSinceEpoch(d), statusCode, origemCode, regIdx, liqDays, analistaIdx, pagDays, etapaIdx, gerenteIdx, rowIdx]);
     });
 
     var totals = computeCumulative(rowData, regIndex, analystIndex, Infinity, etapaIndex, gerenteIndex);
@@ -1213,6 +1430,9 @@
     totals.analystIndex = analystIndex;
     totals.etapaIndex = etapaIndex;
     totals.gerenteIndex = gerenteIndex;
+    totals.detailRows = detailRows;
+    totals.clienteIndex = clienteIndex;
+    totals.seguradoraIndex = seguradoraIndex;
     totals.asOfDate = maxAbertura ? maxAbertura.toISOString() : null;
     totals.totalSemAbertura = totalSemAbertura;
     return totals;
@@ -1395,7 +1615,26 @@
         lastUpdateEl.querySelector("span:last-child").textContent =
           "Última atualização: " + uploadedDate.toLocaleString("pt-BR") + (labelDiffers ? " (" + latest.label + ")" : "");
       }
-      renderDashboard();
+
+      // busca o documento de detalhe (tabela de processos ao filtrar) correspondente ao
+      // snapshot em uso — fica numa colecao separada, pode nao existir (snapshot antigo,
+      // ou o salvamento do detalhe falhou) e nesse caso a tabela simplesmente nao aparece.
+      // Sem tentar casar por id/data (isso se provou frágil no armazenamento real) — como os
+      // dois documentos são sempre salvos juntos, no mesmo envio, o mais recente de cada
+      // coleção sempre corresponde ao mesmo upload.
+      sourceDetail = null;
+      if (sourceDoc) {
+        db.collection("snapshot_details").orderBy("uploadedAt", "desc").limit(1).get().then(function (detailSnap) {
+          sourceDetail = detailSnap.docs.length ? detailSnap.docs[0].data() : null;
+          renderDashboard();
+        }).catch(function (err) {
+          console.error("[detalhe] erro ao buscar a colecao snapshot_details:", err);
+          sourceDetail = null;
+          renderDashboard();
+        });
+      } else {
+        renderDashboard();
+      }
     }).catch(function (err) {
       content.innerHTML = '<div class="empty-state">Erro ao carregar histórico: ' + (err && err.message ? err.message : err) + '</div>';
     });
@@ -1686,6 +1925,7 @@
     if (activeFilter) {
       html += '<div class="active-filter-chip">🔎 Filtrado por: <strong>' + activeFilter.displayLabel + '</strong> ' +
         '<button type="button" id="clearFilterBtn">✕ Limpar filtro</button></div>';
+      html += buildDetailTable(operacaoRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, sourceDoc.data.gerenteIndex, sourceDetail);
     }
 
     // alerta de taxa crítica de atraso — calculado antes do resumo para evitar repetir o mesmo dado
@@ -1829,6 +2069,45 @@
       clearFilterBtn.addEventListener("click", function () {
         activeFilter = null;
         renderDashboard();
+      });
+    }
+
+    document.querySelectorAll(".sortable-th").forEach(function (th) {
+      th.addEventListener("click", function () {
+        var key = th.getAttribute("data-sort-key");
+        if (detailSortCol === key) {
+          detailSortDir = detailSortDir === "asc" ? "desc" : "asc";
+        } else {
+          detailSortCol = key;
+          detailSortDir = "asc";
+        }
+        detailPage = 0;
+        renderDashboardKeepScroll();
+      });
+    });
+
+    // trocar de página ou reordenar reconstrói o HTML inteiro do painel, o que por si só
+    // pode jogar a rolagem de volta pro topo da tela — fazendo a tabela, lá embaixo, parecer
+    // que "fechou". Essa função guarda a posição atual e restaura logo após renderizar.
+    function renderDashboardKeepScroll() {
+      var y = window.scrollY;
+      renderDashboard();
+      window.scrollTo(0, y);
+      requestAnimationFrame(function () { window.scrollTo(0, y); });
+    }
+
+    var detailPrevBtn = document.getElementById("detailPrevBtn");
+    if (detailPrevBtn) {
+      detailPrevBtn.addEventListener("click", function () {
+        detailPage = Math.max(0, detailPage - 1);
+        renderDashboardKeepScroll();
+      });
+    }
+    var detailNextBtn = document.getElementById("detailNextBtn");
+    if (detailNextBtn) {
+      detailNextBtn.addEventListener("click", function () {
+        detailPage = detailPage + 1;
+        renderDashboardKeepScroll();
       });
     }
 
