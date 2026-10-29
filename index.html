@@ -409,6 +409,8 @@
   table.detail-table th.sortable-th { cursor: pointer; user-select: none; }
   table.detail-table th.sortable-th:hover { color: var(--color-fg); }
   table.detail-table td { padding: 8px 10px; border-bottom: 1px solid var(--color-border-line); color: var(--color-fg); white-space: nowrap; }
+  .detail-processo-link { color: var(--color-navy); text-decoration: underline; font-weight: 600; }
+  .detail-processo-link:hover { opacity: .75; }
   table.detail-table tr:last-child td { border-bottom: none; }
   table.detail-table tr:hover td { background: var(--color-bg); }
   .detail-table-note { font-size: 11px; color: var(--color-fg-muted); margin-top: 8px; font-style: italic; }
@@ -802,8 +804,11 @@
     });
     html += '</tr></thead><tbody>';
     shown.forEach(function (r) {
+      var processoCell = r.processo
+        ? '<a href="https://app.alperseguros.lecom.com.br/workspace/flow/' + encodeURIComponent(r.processo) + '" target="_blank" rel="noopener" class="detail-processo-link">' + r.processo + '</a>'
+        : "—";
       html += '<tr>' +
-        '<td>' + (r.processo || "—") + '</td>' +
+        '<td>' + processoCell + '</td>' +
         '<td>' + (r.cliente || "—") + '</td>' +
         '<td>' + (r.cnpj || "—") + '</td>' +
         '<td>' + (r.apolice || "—") + '</td>' +
