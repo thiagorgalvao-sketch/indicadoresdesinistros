@@ -94,6 +94,12 @@
   .logo-badge { height: 30px; width: auto; display: block; }
   .logo-chip { background: #FFFFFF; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; }
   .logo-chip .logo-badge { height: 26px; }
+  /* logo Alper Cargo (fora do chip branco do Lecom) some no fundo escuro — vira silhueta
+     branca no modo escuro, em vez de manter as cores originais */
+  :root[data-theme="dark"] .brand-logos > img.logo-badge { filter: brightness(0) invert(1); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .brand-logos > img.logo-badge { filter: brightness(0) invert(1); }
+  }
 
   .icon-btn {
     display: flex; align-items: center; gap: 6px;
@@ -234,6 +240,27 @@
   .seg-btn.seg-neutral.active { background: var(--color-navy); color: #fff; }
   .seg-btn.seg-amber.active { background: var(--color-amber); color: #4A2E05; }
   .seg-btn.seg-green.active { background: var(--color-green); color: #fff; }
+  /* menu de base (Toda a base/Quiver/Lecom): botoes independentes tipo liga-desliga, em vez
+     de uma unica caixa arredondada com espaco sobrando a direita */
+  #caseDateGroup.seg-group { display: inline-flex; width: auto; border: none; border-radius: 0; overflow: visible; flex-wrap: wrap; gap: 8px; }
+  #caseDateGroup .seg-btn {
+    border: 1px solid var(--color-border-line); border-radius: 999px; background: var(--color-panel);
+  }
+  #caseDateGroup .seg-btn:hover { background: var(--color-border-line); }
+  #caseDateGroup .seg-btn.active { background: var(--color-blue); border-color: var(--color-blue); color: #fff; }
+  @media (max-width: 480px) { #caseDateGroup.seg-group { width: 100%; } #caseDateGroup .seg-btn { flex: 1; text-align: center; } }
+  /* filtros "Todos os processos/Abertos/Finalizados" (Analistas, Comercial da Conta,
+     Reguladoras, Tipo de Registro, Processos via API): mesmo padrão visual do menu de
+     período acima — botoes independentes tipo liga-desliga */
+  .status-filter-group.seg-group { display: inline-flex; flex-wrap: wrap; border: none; border-radius: 0; overflow: visible; gap: 8px; }
+  .status-filter-group .seg-btn {
+    border: 1px solid var(--color-border-line); border-radius: 999px; background: var(--color-panel);
+  }
+  .status-filter-group .seg-btn:hover { background: var(--color-border-line); }
+  .status-filter-group .seg-btn.seg-neutral.active { background: var(--color-blue); border-color: var(--color-blue); color: #fff; }
+  .status-filter-group .seg-btn.seg-amber.active { background: var(--color-amber); border-color: var(--color-amber); color: #4A2E05; }
+  .status-filter-group .seg-btn.seg-green.active { background: var(--color-green); border-color: var(--color-green); color: #fff; }
+  @media (max-width: 480px) { .status-filter-group .seg-btn { flex: 1; text-align: center; } }
   .filter-explain { font-size: 11.5px; color: var(--color-fg-muted); margin: 14px 0 16px; display: block; }
   .source-badge { font-size: 11.5px; color: var(--color-fg-muted); margin: 0 0 16px; display: flex; align-items: center; gap: 6px; }
   .info-dot {
@@ -286,9 +313,7 @@
     display: flex; align-items: flex-start; gap: 12px;
   }
   .kpi-icon {
-    flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    border: 2px solid currentColor; font-size: 17px;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 26px;
   }
   .kpi-body { flex: 1; min-width: 0; }
   .kpi .label { font-size: 11px; color: var(--color-fg-muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
@@ -320,6 +345,7 @@
     width: 26px; height: 26px; border-radius: 50%; border: none; cursor: pointer;
     background: var(--color-border-line); color: var(--color-fg-muted); font-size: 15px; font-weight: 700; line-height: 1;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: .55;
+    margin-left: auto; /* mantem o botao colado a direita mesmo com a seta de recolher depois dele */
   }
   .add-data-btn:hover { opacity: 1; background: var(--color-navy); color: #fff; }
   .presenting #historySection .add-data-btn { display: none; }
@@ -452,7 +478,7 @@
   table.detail-table th.sortable-th { cursor: pointer; user-select: none; }
   table.detail-table th.sortable-th:hover { color: var(--color-fg); }
   table.detail-table td { padding: 8px 10px; border-bottom: 1px solid var(--color-border-line); color: var(--color-fg); white-space: nowrap; }
-  .detail-processo-link { color: var(--color-navy); text-decoration: underline; font-weight: 600; }
+  .detail-processo-link { color: var(--color-blue); text-decoration: underline; font-weight: 600; }
   .detail-processo-link:hover { opacity: .75; }
   table.detail-table tr:last-child td { border-bottom: none; }
   table.detail-table tr:hover td { background: var(--color-bg); }
@@ -495,7 +521,7 @@
 
     .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .kpi { padding: 12px 14px; gap: 8px; }
-    .kpi-icon { width: 32px; height: 32px; font-size: 14px; }
+    .kpi-icon { font-size: 21px; }
     .kpi .value { font-size: 21px; }
     .kpi .label { font-size: 10.5px; }
     .kpi .delta { font-size: 10.5px; flex-wrap: wrap; }
@@ -726,9 +752,10 @@
     return b.value - a.value;
   }
   function catLabel(label, maxLen) {
-    var icon = API_REGULATORS.indexOf(label) !== -1 ? "⚡ " : "";
+    // o indicador de integração via API fica no pill-outline/legenda do card, não aqui —
+    // rótulo de eixo SVG é texto puro, não aceita ícone embutido
     var txt = label.length > maxLen ? label.slice(0, maxLen - 1) + "…" : label;
-    return icon + txt;
+    return txt;
   }
 
   // Transforma "nome.sobrenome" em "Nome Sobrenome" para exibição. Processos com
@@ -741,6 +768,16 @@
         return w.length ? w.charAt(0).toUpperCase() + w.slice(1) : w;
       }).join(" ");
     }).join("; ");
+  }
+
+  // Padroniza o nome do Comercial da Conta (campo "Comercial da Conta" da planilha) em
+  // Title Case — primeira letra de cada palavra maiúscula, resto minúsculo — porque a
+  // planilha traz nomes em tudo maiúsculo, tudo minúsculo ou misturado.
+  function formatGerenteName(raw) {
+    if (!raw || raw === GERENTE_NAO_INFORMADO) return raw;
+    return raw.trim().split(/\s+/).map(function (w) {
+      return w.length ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w;
+    }).join(" ");
   }
 
   // --------- filtro por clique (drill-down) ---------
@@ -962,6 +999,11 @@
   var exportBtn = document.getElementById("exportBtn");
   var uploadCard = document.getElementById("uploadCard");
   var themeToggleBtn = document.getElementById("themeToggleBtn");
+  // modo escuro é o padrão do painel, independente da preferência do sistema — só muda se
+  // a pessoa clicar no botão de alternar tema
+  if (!document.documentElement.hasAttribute("data-theme")) {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
   function isDarkNow() {
     var attr = document.documentElement.getAttribute("data-theme");
     if (attr === "dark") return true;
@@ -1073,7 +1115,11 @@
         wrapper.classList.add("collapsed");
         title.classList.add("is-collapsed");
       }
-      title.addEventListener("click", function () {
+      title.addEventListener("click", function (ev) {
+        // nao recolhe a secao se o clique foi num elemento interativo dentro do titulo
+        // (ex.: o botao "+" de Histórico de atualizações) — senão o clique faz as duas
+        // coisas ao mesmo tempo
+        if (ev.target.closest("button, a, input, select")) return;
         var nowCollapsed = wrapper.classList.toggle("collapsed");
         title.classList.toggle("is-collapsed", nowCollapsed);
         collapsedSections[key] = nowCollapsed;
@@ -1577,7 +1623,7 @@
       var etapaRaw = norm(r["Atividade atual"]);
       var etapaIdx = etapaIdxFor(etapaRaw ? etapaLabel(etapaRaw) : ETAPA_NAO_INFORMADA);
 
-      var gerenteRaw = norm(r["Comercial da Conta"]);
+      var gerenteRaw = formatGerenteName(norm(r["Comercial da Conta"]));
       var gerenteIdx = gerenteIdxFor(gerenteRaw || GERENTE_NAO_INFORMADO);
 
       // dados de detalhe (só para a tabela de processos ao filtrar) — ficam no array
@@ -2031,8 +2077,8 @@
 
     html += '<div class="section-title">Checklist — dados fora da Lecom pendentes de captura</div>';
     html += '<div class="card case-checklist">' +
-      '<div class="checklist-item"><span class="checklist-box">☐</span><div><strong>Dados de RH</strong> (headcount por cargo + salário bruto) <span class="checklist-activates">ativa: Redução de custo da área · Custo por sinistro · Captura de valor</span></div></div>' +
-      '<div class="checklist-item"><span class="checklist-box">☐</span><div><strong>Pesquisa de satisfação</strong> (ferramenta de NPS, ex.: Typeform, Qualtrics) <span class="checklist-activates">ativa: NPS da nova interface · Satisfação e Retenção</span></div></div>' +
+      '<div class="checklist-item"><span class="checklist-box">' + icoSpan("emptyCheckbox") + '</span><div><strong>Dados de RH</strong> (headcount por cargo + salário bruto) <span class="checklist-activates">ativa: Redução de custo da área · Custo por sinistro · Captura de valor</span></div></div>' +
+      '<div class="checklist-item"><span class="checklist-box">' + icoSpan("emptyCheckbox") + '</span><div><strong>Pesquisa de satisfação</strong> (ferramenta de NPS, ex.: Typeform, Qualtrics) <span class="checklist-activates">ativa: NPS da nova interface · Satisfação e Retenção</span></div></div>' +
       '</div>';
 
     return html;
@@ -2086,7 +2132,7 @@
     if (latestUpload) {
       var diasSemAtualizar = Math.floor((Date.now() - latestUpload.getTime()) / 86400000);
       if (diasSemAtualizar > 7) {
-        html += '<div class="stale-banner"><div class="icon">🕘</div><div>' +
+        html += '<div class="stale-banner"><div class="icon">' + icoSpan("clock") + '</div><div>' +
           '<strong>Dados de ' + diasSemAtualizar + ' dias atrás</strong> — nenhuma atualização desde ' +
           latestUpload.toLocaleDateString("pt-BR") + '. Considere atualizar a planilha antes de tomar decisões com base nestes números.' +
           '</div></div>';
@@ -2095,8 +2141,8 @@
 
     // chip do filtro de clique (drill-down) ativo
     if (activeFilter) {
-      html += '<div class="active-filter-chip">🔎 Filtrado por: <strong>' + activeFilter.displayLabel + '</strong> ' +
-        '<button type="button" id="clearFilterBtn">✕ Limpar filtro</button></div>';
+      html += '<div class="active-filter-chip">' + icoSpan("filterFunnel") + ' Filtrado por: <strong>' + activeFilter.displayLabel + '</strong> ' +
+        '<button type="button" id="clearFilterBtn">' + icoSpan("close") + ' Limpar filtro</button></div>';
       html += buildDetailTable(operacaoRowData, sourceDoc.data.regIndex, sourceDoc.data.analystIndex, sourceDoc.data.gerenteIndex, sourceDetail);
     }
 
@@ -2117,19 +2163,19 @@
 
     // KPI cards
     html += '<div class="kpi-grid">';
-    html += kpiCard("Total de processos", current.total, previous && previous.total, null, false, "📁", COLORS.navy, null);
-    html += kpiCard("Em aberto", current.aberto, previous && previous.aberto, null, false, "📂", COLORS.amber, abertoTip);
-    html += kpiCard("Atrasados", current.atrasado, previous && previous.atrasado, true, false, "⏱", COLORS.coral, atrasadoTip);
-    html += kpiCard("Encerrados", current.encerrado, previous && previous.encerrado, false, false, "✅", COLORS.green);
-    html += kpiCard("Atraso médio (dias)", current.atrasoMedioDias, previous && previous.atrasoMedioDias, true, true, "📅", COLORS.maroon, "Média de dias em atraso dos processos que estão atrasados HOJE (na data de corte escolhida), contando a partir da data de abertura de cada um.");
+    html += kpiCard("Total de processos", current.total, previous && previous.total, null, false, ICONS.folder, COLORS.navy, null);
+    html += kpiCard("Em aberto", current.aberto, previous && previous.aberto, null, false, ICONS.folderOpen, COLORS.amber, abertoTip);
+    html += kpiCard("Atrasados", current.atrasado, previous && previous.atrasado, true, false, ICONS.clock, COLORS.coral, atrasadoTip);
+    html += kpiCard("Encerrados", current.encerrado, previous && previous.encerrado, false, false, ICONS.checkCircle, COLORS.green);
+    html += kpiCard("Atraso médio (dias)", current.atrasoMedioDias, previous && previous.atrasoMedioDias, true, true, ICONS.calendar, COLORS.maroon, "Média de dias em atraso dos processos que estão atrasados HOJE (na data de corte escolhida), contando a partir da data de abertura de cada um.");
     html += "</div>";
 
     // resumo executivo e alerta de atraso
     if (summaryText) {
-      html += '<div class="summary-banner">📌 ' + summaryText + '</div>';
+      html += '<div class="summary-banner">' + icoSpan("pin") + ' ' + summaryText + '</div>';
     }
     if (showAlert) {
-      html += '<div class="alert-banner"><div class="icon">⚠️</div><div>' +
+      html += '<div class="alert-banner"><div class="icon">' + icoSpan("alertTriangle") + '</div><div>' +
         '<strong>' + fmt(current.atrasado) + ' processos atrasados</strong> — ' +
         (atrasoRate * 100).toFixed(0) + '% dos processos em aberto (' + fmt(current.aberto) + ') estão com prazo vencido.' +
         '</div></div>';
@@ -2146,53 +2192,53 @@
     // charts
     html += '<div class="section-title">Status da operação</div>';
     html += '<div class="chart-grid">';
-    html += '<div class="chart-card"><h3>PROCESSOS POR STATUS <span class="hint-click">💡 clique no gráfico para filtrar</span></h3><div id="chart-status"></div></div>';
-    html += '<div class="chart-card"><h3>STATUS DETALHADO DO PROCESSO <span class="hint-click">💡 clique no gráfico para filtrar</span></h3><div id="chart-detalhado"></div></div>';
+    html += '<div class="chart-card"><h3>PROCESSOS POR STATUS <span class="hint-click">' + icoSpan("lightbulb") + ' clique no gráfico para filtrar</span></h3><div id="chart-status"></div></div>';
+    html += '<div class="chart-card"><h3>STATUS DETALHADO DO PROCESSO <span class="hint-click">' + icoSpan("lightbulb") + ' clique no gráfico para filtrar</span></h3><div id="chart-detalhado"></div></div>';
     html += '</div>';
 
     html += '<div class="section-title">Processos por etapa</div>';
-    html += '<div class="chart-card etapa-card"><h3>ATIVIDADE ATUAL <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' +
-      '<div class="etapa-group-label etapa-group-andamento">🔄 Em andamento</div>' +
+    html += '<div class="chart-card etapa-card"><h3>ATIVIDADE ATUAL <span class="hint-click">' + icoSpan("lightbulb") + ' clique no gráfico para filtrar</span></h3>' +
+      '<div class="etapa-group-label etapa-group-andamento">' + icoSpan("refresh") + ' Em andamento</div>' +
       '<div id="chart-etapa-andamento"></div>' +
-      '<div class="etapa-group-label etapa-group-finalizado">✅ Finalizado</div>' +
+      '<div class="etapa-group-label etapa-group-finalizado">' + icoSpan("checkCircle") + ' Finalizado</div>' +
       '<div id="chart-etapa-finalizado"></div>' +
       '</div>';
 
-    html += '<div class="chart-card" style="margin-bottom:16px;"><h3>⚠️ ONDE ESTÃO OS ATRASADOS <span class="hint-click">💡 clique no gráfico para filtrar</span></h3><div id="chart-etapa-atraso"></div></div>';
+    html += '<div class="chart-card" style="margin-bottom:16px;"><h3>' + icoSpan("alertTriangle") + ' ONDE ESTÃO OS ATRASADOS <span class="hint-click">' + icoSpan("lightbulb") + ' clique no gráfico para filtrar</span></h3><div id="chart-etapa-atraso"></div></div>';
 
     html += '<div class="section-title">Analistas</div>';
-    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>ANALISTAS — VOLUME TOTAL <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' +
+    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>ANALISTAS <span class="hint-click">' + icoSpan("lightbulb") + ' clique no gráfico para filtrar</span></h3>' +
       '<div style="display:flex; align-items:center; gap:10px;">' +
       statusFilterGroupHtml() +
       '<button class="secondary" id="analystToggleBtn" style="display:none; padding:5px 12px; font-size:11.5px;"></button>' +
       '</div></div>' +
       '<div class="chart-search-row">' +
-      '<input type="text" class="chart-search" id="analystSearchInput" placeholder="🔍 Buscar analista..." value="' + analystSearch.replace(/"/g, "&quot;") + '">' +
-      '<button type="button" class="secondary chart-export-btn" id="analystExportBtn" title="Baixar esta lista em CSV">⬇︎ CSV</button>' +
+      '<input type="text" class="chart-search" id="analystSearchInput" placeholder="Buscar analista..." value="' + analystSearch.replace(/"/g, "&quot;") + '">' +
+      '<button type="button" class="secondary chart-export-btn" id="analystExportBtn" title="Baixar esta lista em CSV">' + icoSpan("download") + ' CSV</button>' +
       '</div>' +
       '<div id="chart-analista"></div></div>';
 
     html += '<div class="section-title">Gerentes de Relacionamento</div>';
-    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>GERENTES DE RELACIONAMENTO — VOLUME TOTAL <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' +
+    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>COMERCIAL DA CONTA <span class="hint-click">' + icoSpan("lightbulb") + ' clique no gráfico para filtrar</span></h3>' +
       statusFilterGroupHtml() +
       '</div>' +
       '<div class="chart-search-row">' +
-      '<input type="text" class="chart-search" id="gerenteSearchInput" placeholder="🔍 Buscar gerente..." value="' + gerenteSearch.replace(/"/g, "&quot;") + '">' +
-      '<button type="button" class="secondary chart-export-btn" id="gerenteExportBtn" title="Baixar esta lista em CSV">⬇︎ CSV</button>' +
+      '<input type="text" class="chart-search" id="gerenteSearchInput" placeholder="Buscar gerente..." value="' + gerenteSearch.replace(/"/g, "&quot;") + '">' +
+      '<button type="button" class="secondary chart-export-btn" id="gerenteExportBtn" title="Baixar esta lista em CSV">' + icoSpan("download") + ' CSV</button>' +
       '</div>' +
       '<div id="chart-gerente"></div></div>';
 
     html += '<div class="section-title">Reguladoras</div>';
-    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>REGULADORAS — VOLUME TOTAL <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' +
+    html += '<div class="chart-card" style="margin-bottom:16px;"><div class="chart-card-head"><h3>REGULADORAS <span class="hint-click">' + icoSpan("lightbulb") + ' clique no gráfico para filtrar</span></h3>' +
       '<div style="display:flex; align-items:center; gap:10px;">' +
       statusFilterGroupHtml() +
       '<button class="secondary" id="regToggleBtn" style="display:none; padding:5px 12px; font-size:11.5px;"></button>' +
       '</div></div>' +
       '<div class="chart-search-row">' +
-      '<input type="text" class="chart-search" id="regSearchInput" placeholder="🔍 Buscar reguladora..." value="' + regSearch.replace(/"/g, "&quot;") + '">' +
-      '<button type="button" class="secondary chart-export-btn" id="regExportBtn" title="Baixar esta lista em CSV">⬇︎ CSV</button>' +
+      '<input type="text" class="chart-search" id="regSearchInput" placeholder="Buscar reguladora..." value="' + regSearch.replace(/"/g, "&quot;") + '">' +
+      '<button type="button" class="secondary chart-export-btn" id="regExportBtn" title="Baixar esta lista em CSV">' + icoSpan("download") + ' CSV</button>' +
       '</div>' +
-      '<div id="chart-top"></div><div style="margin-top:10px;"><span class="pill-outline">⚡ Reguladora com integração via API (Associada)</span></div></div>';
+      '<div id="chart-top"></div><div style="margin-top:10px;"><span class="pill-outline">' + icoSpan("bolt") + ' Reguladora com integração via API (Associada)</span></div></div>';
 
     // reguladoras associadas x não associadas — pedido do Antonio Carlos na reunião de 23/10;
     // fica junto dos demais dados de reguladoras, logo após o ranking por volume.
@@ -2214,14 +2260,14 @@
         '<span class="item"><span class="dot" style="background:' + COLORS.navy + ';"></span>Associadas</span>' +
         '<span class="item"><span class="dot" style="background:' + COLORS.gray + ';"></span>Não associadas</span>' +
         '</div>' +
-        '<div class="pill-outline">⚡ Associadas: Dórica, Fox, L Perna, Serra & Company</div>' +
+        '<div class="pill-outline">' + icoSpan("bolt") + ' Associadas: Dórica, Fox, L Perna, Serra & Company</div>' +
         '</div>';
     }
 
     html += '<div class="section-title">Composição da base</div>';
     html += '<div class="chart-grid">';
-    html += '<div class="chart-card"><div class="chart-card-head"><h3>TIPO DE REGISTRO <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' + statusFilterGroupHtml() + '</div><div id="chart-tipo"></div></div>';
-    html += '<div class="chart-card"><div class="chart-card-head"><h3>PROCESSOS VIA API (POR REGULADORA) <span class="hint-click">💡 clique no gráfico para filtrar</span></h3>' + statusFilterGroupHtml() + '</div><div id="chart-api"></div></div>';
+    html += '<div class="chart-card"><div class="chart-card-head"><h3>TIPO DE REGISTRO <span class="hint-click">' + icoSpan("lightbulb") + ' clique no gráfico para filtrar</span></h3>' + statusFilterGroupHtml() + '</div><div id="chart-tipo"></div></div>';
+    html += '<div class="chart-card"><div class="chart-card-head"><h3>PROCESSOS VIA API (POR REGULADORA) <span class="hint-click">' + icoSpan("lightbulb") + ' clique no gráfico para filtrar</span></h3>' + statusFilterGroupHtml() + '</div><div id="chart-api"></div></div>';
     html += '</div>';
 
     // tendência — calculada por fatiamento de data, não depende de múltiplos uploads
@@ -2233,7 +2279,7 @@
 
     // history — fica fora do PDF; aqui é só um log de uploads, não participa do corte por data
     html += '<div id="historySection">';
-    html += '<div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">Histórico de atualizações <button type="button" class="add-data-btn" id="addDataBtn" title="Adicionar nova atualização" aria-label="Adicionar nova atualização">+</button></div>';
+    html += '<div class="section-title" style="display:flex; align-items:center; gap:10px;">Histórico de atualizações <button type="button" class="add-data-btn" id="addDataBtn" title="Adicionar nova atualização" aria-label="Adicionar nova atualização">+</button></div>';
     html += '<div class="card"><div class="table-scroll"><table class="history"><thead><tr><th>Rótulo</th><th>Linhas</th><th>Enviado em</th><th></th></tr></thead><tbody>';
     allDocs.forEach(function (d) {
       var r = d.data;
@@ -2242,7 +2288,7 @@
         '<td>' + (r.label || "—") + (sourceDoc && d.id === sourceDoc.id ? ' <span class="pill now">fonte atual</span>' : '') + '</td>' +
         '<td>' + fmt(r.total) + '</td>' +
         '<td>' + when + '</td>' +
-        '<td class="actions">' + (d.id !== "local" ? '<button class="del-btn" data-del-id="' + d.id + '" title="Excluir este registro" aria-label="Excluir registro ' + (r.label || "") + '">🗑</button>' : '') + '</td>' +
+        '<td class="actions">' + (d.id !== "local" ? '<button class="del-btn" data-del-id="' + d.id + '" title="Excluir este registro" aria-label="Excluir registro ' + (r.label || "") + '">' + icoSpan("trash") + '</button>' : '') + '</td>' +
         '</tr>';
     });
     html += '</tbody></table></div></div>';
@@ -2372,7 +2418,7 @@
           btn.style.fontSize = "11.5px";
           resetTimer = setTimeout(function () {
             confirming = false;
-            btn.textContent = "🗑";
+            btn.innerHTML = icoSpan("trash");
             btn.style.color = "";
             btn.style.fontWeight = "";
             btn.style.fontSize = "";
@@ -2388,7 +2434,7 @@
         }).catch(function (err) {
           setStatus("Erro ao excluir: " + (err && err.message ? err.message : err), "err");
           btn.disabled = false;
-          btn.textContent = "🗑";
+          btn.innerHTML = icoSpan("trash");
         });
       });
     });
@@ -2585,7 +2631,7 @@
     var hasVal = curr !== null && curr !== undefined;
     var displayVal = hasVal ? (isDaysMetric ? curr : fmt(curr)) : "—";
     return '<div class="kpi">' +
-      '<div class="kpi-icon" style="color:' + (iconColor || COLORS.navy) + ';">' + (icon || "📊") + '</div>' +
+      '<div class="kpi-icon" style="color:' + (iconColor || COLORS.navy) + ';">' + (icon || ICONS.barChart) + '</div>' +
       '<div class="kpi-body">' +
       '<div class="label">' + label + (tooltip ? ' <span class="info-dot" data-tip="' + tooltip + '">?</span>' : '') + '</div>' +
       '<div class="value"' + (hasVal ? ' data-target="' + curr + '"' : '') + '>' + (hasVal ? "0" : displayVal) + '</div>' +
