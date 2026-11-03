@@ -999,10 +999,19 @@
   var exportBtn = document.getElementById("exportBtn");
   var uploadCard = document.getElementById("uploadCard");
   var themeToggleBtn = document.getElementById("themeToggleBtn");
-  // modo escuro é o padrão do painel, independente da preferência do sistema — só muda se
-  // a pessoa clicar no botão de alternar tema
+  // detecta celular/tablet pelo user agent (cobre a grande maioria dos aparelhos reais); iPadOS
+  // recente se identifica como "desktop" (MacIntel) no user agent, por isso o teste extra de
+  // touch abaixo cobre esse caso tambem
+  function isMobileOrTabletDevice() {
+    var ua = navigator.userAgent || "";
+    if (/Android|iPhone|iPod|iPad|Mobile|Tablet|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true;
+    if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true;
+    return false;
+  }
+  // padrao: escuro em celular/tablet, claro em computador/notebook — só muda se a pessoa
+  // clicar no botão de alternar tema
   if (!document.documentElement.hasAttribute("data-theme")) {
-    document.documentElement.setAttribute("data-theme", "dark");
+    document.documentElement.setAttribute("data-theme", isMobileOrTabletDevice() ? "dark" : "light");
   }
   function isDarkNow() {
     var attr = document.documentElement.getAttribute("data-theme");
@@ -1092,14 +1101,18 @@
   var allDocs = [];
   var sourceDoc = null; // upload mais recente com dados linha-a-linha (rowData), base de todo o corte por data
   var sourceDetail = null; // dados de detalhe (tabela de processos) correspondentes a sourceDoc, carregados a parte
-  var collapsedSections = {}; // guarda quais secoes o usuario fechou, pelo texto do titulo, pra persistir entre re-renders
+  var collapsedSections = { "Histórico de atualizações": true }; // guarda quais secoes o usuario fechou, pelo texto do titulo (sem contar botoes internos), pra persistir entre re-renders; Historico comeca recolhido por padrao
 
   // Agrupa tudo que vem depois de cada ".section-title" (ate o proximo) num wrapper
   // clicavel pra recolher/expandir. Roda de novo a cada render, pois o HTML e
   // reconstruido do zero; o estado fica em collapsedSections, fora do DOM.
   function makeSectionsCollapsible() {
     Array.from(content.querySelectorAll(".section-title")).forEach(function (title) {
-      var key = title.textContent.trim();
+      // chave = só o texto do título, sem contar botões internos (ex.: o "+" de
+      // Histórico de atualizações) — senão qualquer mudança no botão quebraria a chave
+      var clone = title.cloneNode(true);
+      clone.querySelectorAll("button, a, input, select").forEach(function (el) { el.remove(); });
+      var key = clone.textContent.trim();
       var wrapper = document.createElement("div");
       wrapper.className = "collapsible-body";
       var next = title.nextElementSibling;
