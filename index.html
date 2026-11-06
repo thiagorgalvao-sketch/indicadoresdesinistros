@@ -916,7 +916,7 @@
     html += '<div class="table-scroll"><table class="detail-table"><thead><tr>';
     COLS.forEach(function (c) {
       var arrow = detailSortCol === c.key ? (detailSortDir === "desc" ? " ▼" : " ▲") : "";
-      html += '<th class="sortable-th" data-sort-key="' + c.key + '" title="Clique para ordenar">' + c.label + arrow + '</th>';
+      html += '<th class="sortable-th" data-sort-key="' + c.key + '" title="Clique para ordenar" role="button" tabindex="0" aria-label="Ordenar por ' + c.label + '">' + c.label + arrow + '</th>';
     });
     html += '</tr></thead><tbody>';
     shown.forEach(function (r) {
@@ -1124,18 +1124,24 @@
       toMove.forEach(function (el) { wrapper.appendChild(el); });
       title.insertAdjacentElement("afterend", wrapper);
       title.classList.add("collapsible-title");
-      if (collapsedSections[key]) {
+      title.setAttribute("role", "button");
+      title.setAttribute("tabindex", "0");
+      var isCollapsedNow = !!collapsedSections[key];
+      if (isCollapsedNow) {
         wrapper.classList.add("collapsed");
         title.classList.add("is-collapsed");
       }
-      title.addEventListener("click", function (ev) {
-        // nao recolhe a secao se o clique foi num elemento interativo dentro do titulo
-        // (ex.: o botao "+" de Histórico de atualizações) — senão o clique faz as duas
-        // coisas ao mesmo tempo
+      title.setAttribute("aria-expanded", String(!isCollapsedNow));
+      function toggleSection(ev) {
         if (ev.target.closest("button, a, input, select")) return;
         var nowCollapsed = wrapper.classList.toggle("collapsed");
         title.classList.toggle("is-collapsed", nowCollapsed);
+        title.setAttribute("aria-expanded", String(!nowCollapsed));
         collapsedSections[key] = nowCollapsed;
+      }
+      title.addEventListener("click", toggleSection);
+      title.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggleSection(ev); }
       });
     });
   }
@@ -1390,7 +1396,6 @@
     delete mainPayload.seguradoraIndex;
 
     db.collection("snapshots").add(mainPayload).then(function (mainDoc) {
-      console.log("[detalhe] snapshot principal salvo, retorno do add():", mainDoc, "| mainDoc.id =", mainDoc && mainDoc.id);
       var detailPayload = {
         mainSnapshotId: mainDoc && mainDoc.id,
         uploadedAt: uploadedAt,
@@ -1402,9 +1407,7 @@
       // recarregar — chamar loadAndRender antes disso criava uma corrida: a releitura
       // podia rodar antes do documento de detalhe existir de verdade no banco, fazendo
       // a tabela aparecer como "não disponível" mesmo quando o salvamento ia dar certo.
-      return db.collection("snapshot_details").add(detailPayload).then(function (detailDoc) {
-        console.log("[detalhe] documento de detalhe salvo com sucesso, retorno do add():", detailDoc, "| payload.uploadedAt usado para casar depois:", uploadedAt);
-      }).catch(function (err) {
+      return db.collection("snapshot_details").add(detailPayload).catch(function (err) {
         console.error("[detalhe] ERRO ao salvar os dados de detalhe (tabela de processos ficará indisponível para este snapshot):", err);
       }).then(function () {
         setStatus(icoSpan("check") + " Snapshot \"" + label + "\" salvo e painel atualizado.", "ok");
@@ -2264,7 +2267,7 @@
       html += '<div class="card assoc-breakdown-card">' +
         '<h3>Reguladoras associadas x não associadas</h3>' +
         '<div class="assoc-total-highlight">' +
-        '<div class="assoc-total-stat"><span class="n" style="color:' + COLORS.navy + ';">' + fmt(current.assoc.total) + '</span><span class="l">Associadas · Total geral (' + totalAssocPct + '%)</span></div>' +
+        '<div class="assoc-total-stat"><span class="n" style="color:#2E86C1;">' + fmt(current.assoc.total) + '</span><span class="l">Associadas · Total geral (' + totalAssocPct + '%)</span></div>' +
         '<div class="assoc-total-stat"><span class="n" style="color:' + COLORS.gray + ';">' + fmt(current.naoAssoc.total) + '</span><span class="l">Não associadas · Total geral (' + totalNaoAssocPct + '%)</span></div>' +
         '</div>' +
         '<div class="assoc-group-label">Por status</div>' +
@@ -2364,7 +2367,7 @@
     }
 
     document.querySelectorAll(".sortable-th").forEach(function (th) {
-      th.addEventListener("click", function () {
+      function activateSort() {
         var key = th.getAttribute("data-sort-key");
         if (detailSortCol === key) {
           detailSortDir = detailSortDir === "asc" ? "desc" : "asc";
@@ -2374,6 +2377,10 @@
         }
         detailPage = 0;
         renderDashboardKeepScroll();
+      }
+      th.addEventListener("click", activateSort);
+      th.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); activateSort(); }
       });
     });
 
