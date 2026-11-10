@@ -189,6 +189,14 @@
   .tab-btn.active { color: var(--color-navy); border-bottom-color: var(--color-navy); }
   :root[data-theme="dark"] .tab-btn.active { color: var(--color-accent-strong); border-bottom-color: var(--color-accent-strong); }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tab-btn.active { color: var(--color-accent-strong); border-bottom-color: var(--color-accent-strong); } }
+  /* com 3 abas, o rotulo completo quebra em duas linhas e fica apertado em telas
+     estreitas — troca pra uma versao curta abaixo de 480px */
+  .tab-label-short { display: none; }
+  @media (max-width: 480px) {
+    .tab-label-full { display: none; }
+    .tab-label-short { display: inline; }
+    .tab-btn { padding: 10px 4px; font-size: var(--fs-xs); }
+  }
 
   .case-header { margin-bottom: 20px; }
   .case-header .tag { font-size: var(--fs-xs); font-weight: 700; color: var(--color-fg-muted); letter-spacing: .04em; }
@@ -615,8 +623,9 @@
 
   <div class="sticky-filter-zone" id="stickyFilterZone">
   <div class="tab-nav" id="tabNav" style="display:none;">
-    <button type="button" class="tab-btn active" data-tab="operacao">OPERAÇÃO</button>
-    <button type="button" class="tab-btn" data-tab="case">MÉTRICAS-CHAVE DO CASE</button>
+    <button type="button" class="tab-btn active" data-tab="operacao"><span class="tab-label-full">OPERAÇÃO</span><span class="tab-label-short">OPERAÇÃO</span></button>
+    <button type="button" class="tab-btn" data-tab="case"><span class="tab-label-full">MÉTRICAS-CHAVE DO CASE</span><span class="tab-label-short">CASE</span></button>
+    <button type="button" class="tab-btn" data-tab="backlog"><span class="tab-label-full">BACKLOG DE MELHORIAS</span><span class="tab-label-short">BACKLOG</span></button>
   </div>
 
   <div class="period-bar" id="periodBar" style="display:none;">
@@ -656,6 +665,7 @@
   <p class="source-badge" id="sourceBadge" style="display:none;"></p>
 
   <div id="content"></div>
+  <input type="file" id="backlogFileInput" accept=".xlsx,.xls" aria-label="Selecionar planilha de backlog para upload" style="display:none;" />
   <div class="card upload-card" id="uploadCard">
     <div class="upload-row">
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" aria-label="Selecionar planilha para upload" />
@@ -1025,6 +1035,7 @@
   }
 
   var fileInput = document.getElementById("fileInput");
+  var backlogFileInput = document.getElementById("backlogFileInput");
   var labelInput = document.getElementById("labelInput");
   var processBtn = document.getElementById("processBtn");
   var statusMsg = document.getElementById("statusMsg");
@@ -1143,6 +1154,7 @@
   var allDocs = [];
   var sourceDoc = null; // upload mais recente com dados linha-a-linha (rowData), base de todo o corte por data
   var sourceDetail = null; // dados de detalhe (tabela de processos) correspondentes a sourceDoc, carregados a parte
+  var backlogDoc = null; // ultimo upload da planilha de backlog de melhorias (Produção Assistida - Sinistros), independente do sourceDoc
   var collapsedSections = { "Histórico de atualizações": true }; // guarda quais secoes o usuario fechou, pelo texto do titulo (sem contar botoes internos), pra persistir entre re-renders; Historico comeca recolhido por padrao
 
   // Agrupa tudo que vem depois de cada ".section-title" (ate o proximo) num wrapper
@@ -1446,6 +1458,56 @@
     labelInput.value = pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear();
   })();
 
+  // upload da planilha de backlog (Produção Assistida - Sinistros) — independente do fluxo
+  // principal de indicadores; le, agrega e salva numa colecao propria (backlog_snapshots)
+  function setBacklogStatus(msg, kind) {
+    var el = document.getElementById("backlogStatusMsg");
+    if (el) { el.textContent = msg; el.className = "status-msg" + (kind ? " " + kind : ""); }
+  }
+  backlogFileInput.addEventListener("change", function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setBacklogStatus("Lendo \"" + file.name + "\"…", "");
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      try {
+        var data = new Uint8Array(ev.target.result);
+        var wb = XLSX.read(data, { type: "array", cellDates: true });
+        var sheet = pickBacklogSheet(wb);
+        if (!sheet) {
+          setBacklogStatus("Não encontrei uma aba com as colunas esperadas (\"Etapa do Fluxo\", \"Status da Correção\"). Abas encontradas: " + (wb.SheetNames || []).join(", "), "err");
+          return;
+        }
+        var rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        var items = parseBacklogRows(rows);
+        if (!items.length) {
+          setBacklogStatus("Nenhuma linha com descrição e status preenchidos foi encontrada nessa planilha.", "err");
+          return;
+        }
+        var aggregates = computeBacklogAggregates(items);
+        var payload = { uploadedAt: new Date().toISOString(), items: items, aggregates: aggregates };
+        backlogDoc = payload;
+        renderDashboard();
+        setBacklogStatus(items.length + " itens processados. Salvando…", "ok");
+        // o banco so aceita JSON puro — datas de registro/correcao ficam como objetos Date
+        // pra todo o calculo acima (dias em aberto, tempo medio), mas precisam virar string
+        // ISO antes de salvar; JSON.parse(JSON.stringify(...)) faz essa conversao sozinho
+        var payloadToSave = JSON.parse(JSON.stringify(payload));
+        dbPromise.then(function (db) {
+          if (!db) { setBacklogStatus(items.length + " itens processados (sem conexão com o banco — visível só nesta sessão).", "ok"); return; }
+          db.collection("backlog_snapshots").add(payloadToSave).then(function () {
+            setBacklogStatus(items.length + " itens processados e salvos.", "ok");
+          }).catch(function (err) {
+            setBacklogStatus("Processado, mas falhou ao salvar: " + (err && err.message ? err.message : err), "err");
+          });
+        });
+      } catch (err) {
+        setBacklogStatus("Erro ao ler o arquivo: " + err.message, "err");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
   fileInput.addEventListener("change", function (e) {
     var file = e.target.files && e.target.files[0];
     pendingRows = null;
@@ -1611,6 +1673,100 @@
   }
 
   function norm(v) { return (v === null || v === undefined) ? "" : String(v).trim(); }
+
+  // ---------- Backlog de melhorias (aba executiva, independente do sourceDoc) ----------
+
+  function pickBacklogSheet(wb) {
+    var names = wb.SheetNames || [];
+    var byName = names.find(function (n) { return n.trim().toLowerCase() === "homologação assistida"; });
+    if (byName) return wb.Sheets[byName];
+    for (var i = 0; i < names.length; i++) {
+      var sh = wb.Sheets[names[i]];
+      var json = XLSX.utils.sheet_to_json(sh, { header: 1, range: 0 });
+      if (json && json[0] && json[0].some(function (h) { return String(h).trim() === "Etapa do Fluxo"; }) &&
+        json[0].some(function (h) { return String(h).trim() === "Status da Correção"; })) {
+        return sh;
+      }
+    }
+    return null;
+  }
+
+  var BACKLOG_STATUS_ABERTOS = ["PENDENTE", "EM REFINAMENTO", "EM ANDAMENTO"];
+
+  // Filtra as linhas-placeholder vazias (ID reservado mas sem descricao preenchida) e
+  // normaliza os campos que a visão executiva usa.
+  function parseBacklogRows(rows) {
+    var items = [];
+    rows.forEach(function (r) {
+      var descricao = norm(r["Descrição do Problema / Observação"]);
+      var status = norm(r["Status da Correção"]).toUpperCase();
+      if (!descricao || !status) return; // linha placeholder, ainda nao preenchida
+      var dataRegistro = r["Data do Registro"] instanceof Date ? r["Data do Registro"] : null;
+      var dataCorrecao = r["Data da Correção"] instanceof Date ? r["Data da Correção"] : null;
+      items.push({
+        id: norm(r["ID"]),
+        etapa: norm(r["Etapa do Fluxo"]) || "Não informado",
+        descricao: descricao,
+        tipo: norm(r["Tipo de Feedback"]).toUpperCase() || "Não informado",
+        impacto: norm(r["Impacto"]).toUpperCase() || "Não informado",
+        status: status,
+        responsavel: norm(r["Responsável pela abertura"]),
+        dataRegistro: dataRegistro,
+        dataCorrecao: dataCorrecao,
+        parecer: norm(r["Parecer (Time Técnico/Squad)"]),
+      });
+    });
+    return items;
+  }
+
+  // Agrega os itens numa visão gerencial: taxa de atendimento, onde se concentram os
+  // pedidos, itens de alto impacto ainda abertos (o que mais importa pra gestão) e tempo
+  // medio de resolução.
+  function computeBacklogAggregates(items) {
+    var total = items.length;
+    var porStatus = {};
+    var porEtapa = {};
+    var porTipo = {}; // {tipo: {total, resolvido}}
+    var somaDiasResolucao = 0, countResolvidosComDatas = 0;
+    var altoImpactoAbertos = [];
+
+    items.forEach(function (it) {
+      porStatus[it.status] = (porStatus[it.status] || 0) + 1;
+      porEtapa[it.etapa] = (porEtapa[it.etapa] || 0) + 1;
+      if (!porTipo[it.tipo]) porTipo[it.tipo] = { total: 0, resolvido: 0 };
+      porTipo[it.tipo].total++;
+      if (it.status === "RESOLVIDO") {
+        porTipo[it.tipo].resolvido++;
+        if (it.dataRegistro && it.dataCorrecao) {
+          var dias = Math.round((it.dataCorrecao - it.dataRegistro) / 86400000);
+          if (dias >= 0) { somaDiasResolucao += dias; countResolvidosComDatas++; }
+        }
+      }
+      if (it.impacto === "ALTA" && BACKLOG_STATUS_ABERTOS.indexOf(it.status) !== -1) {
+        altoImpactoAbertos.push(it);
+      }
+    });
+
+    altoImpactoAbertos.sort(function (a, b) {
+      var da = a.dataRegistro ? a.dataRegistro.getTime() : Infinity;
+      var db_ = b.dataRegistro ? b.dataRegistro.getTime() : Infinity;
+      return da - db_; // mais antigos primeiro — sao os que mais tempo esperam atencao
+    });
+
+    var resolvidos = porStatus["RESOLVIDO"] || 0;
+    var cancelados = porStatus["CANCELADO"] || 0;
+    var baseTaxa = total - cancelados; // cancelado nao conta nem como sucesso nem como pendencia
+
+    return {
+      total: total,
+      porStatus: porStatus,
+      porEtapa: porEtapa,
+      porTipo: porTipo,
+      taxaAtendimento: baseTaxa > 0 ? Math.round((resolvidos / baseTaxa) * 100) : null,
+      tempoMedioResolucaoDias: countResolvidosComDatas > 0 ? Math.round(somaDiasResolucao / countResolvidosComDatas) : null,
+      altoImpactoAbertos: altoImpactoAbertos,
+    };
+  }
 
   function daysSinceEpoch(d) { return Math.floor(d.getTime() / 86400000); }
   function dateFromDays(days) { return new Date(days * 86400000); }
@@ -1916,6 +2072,15 @@
   function loadAndRender(db) {
     currentDb = db;
     showSkeleton();
+    // backlog de melhorias é independente do fluxo principal de indicadores — busca em
+    // paralelo, sem bloquear o carregamento do resto do painel
+    db.collection("backlog_snapshots").orderBy("uploadedAt", "desc").limit(1).get().then(function (backSnap) {
+      backlogDoc = backSnap.docs.length ? backSnap.docs[0].data() : null;
+      if (activeTab === "backlog") renderDashboard();
+    }).catch(function (err) {
+      console.error("[backlog] erro ao buscar a colecao backlog_snapshots:", err);
+      backlogDoc = null;
+    });
     db.collection("snapshots").orderBy("uploadedAt", "desc").limit(20).get().then(function (snap) {
       processBtn.disabled = !pendingRows;
       if (snap.empty) {
@@ -2209,6 +2374,22 @@
   function renderDashboard() {
     var current, previous, cutoffDate, previousCutoffDate;
 
+    // aba de backlog e independente dos dados de Sinistros (sourceDoc) — resolve antes de
+    // qualquer coisa que dependa deles
+    if (activeTab === "backlog") {
+      toolbarRow.style.display = "none";
+      filterExplain.style.display = "none";
+      sourceBadge.style.display = "none";
+      periodBar.style.display = "none";
+      content.innerHTML = renderBacklogTab(backlogDoc);
+      content.classList.remove("content-fade-in");
+      void content.offsetWidth;
+      content.classList.add("content-fade-in");
+      animateCounters();
+      wireBacklogTab();
+      return;
+    }
+
     if (sourceDoc) {
       cutoffDate = dateFilter.value ? new Date(dateFilter.value + "T12:00:00") : dateFromDays(Math.max.apply(null, sourceDoc.data.rowData.map(function (r) { return r[0]; })));
       var curDays = daysSinceEpoch(cutoffDate);
@@ -2285,7 +2466,7 @@
 
     // KPI cards
     html += '<div class="kpi-grid">';
-    html += kpiCard("Total de processos", current.total, previous && previous.total, null, false, ICONS.folder, COLORS.navy, null);
+    html += kpiCard("Total de processos", current.total, previous && previous.total, null, false, ICONS.folder, "#2E86C1", null);
     html += kpiCard("Em aberto", current.aberto, previous && previous.aberto, null, false, ICONS.folderOpen, COLORS.amber, abertoTip);
     html += kpiCard("Atrasados", current.atrasado, previous && previous.atrasado, true, false, ICONS.clock, COLORS.coral, atrasadoTip);
     html += kpiCard("Encerrados", current.encerrado, previous && previous.encerrado, false, false, ICONS.checkCircle, COLORS.green);
@@ -2305,7 +2486,7 @@
 
     // legenda de cores — logo antes dos gráficos que usam essas cores
     html += '<div class="color-legend">' +
-      '<span class="item"><span class="dot" style="background:' + COLORS.navy + ';"></span>Total / neutro</span>' +
+      '<span class="item"><span class="dot" style="background:#2E86C1;"></span>Total / neutro</span>' +
       '<span class="item"><span class="dot" style="background:' + COLORS.amber + ';"></span>Em aberto / atenção</span>' +
       '<span class="item"><span class="dot" style="background:' + COLORS.coral + ';"></span>Atrasado / crítico</span>' +
       '<span class="item"><span class="dot" style="background:' + COLORS.green + ';"></span>Encerrado / concluído</span>' +
@@ -2387,7 +2568,7 @@
         '<div class="assoc-group-label">Por status</div>' +
         '<div id="chart-assoc"></div>' +
         '<div class="assoc-legend">' +
-        '<span class="item"><span class="dot" style="background:' + COLORS.navy + ';"></span>Associadas</span>' +
+        '<span class="item"><span class="dot" style="background:#2E86C1;"></span>Associadas</span>' +
         '<span class="item"><span class="dot" style="background:' + COLORS.gray + ';"></span>Não associadas</span>' +
         '</div>' +
         '<div class="pill-outline">' + icoSpan("bolt") + ' Associadas: Dórica, Fox, L Perna, Serra & Company</div>' +
@@ -2769,11 +2950,127 @@
     }
   }
 
+  var BACKLOG_STATUS_COLOR = {
+    "RESOLVIDO": COLORS.green,
+    "EM ANDAMENTO": "#2E86C1",
+    "EM REFINAMENTO": COLORS.amber,
+    "PENDENTE": COLORS.coral,
+    "CANCELADO": COLORS.gray,
+  };
+  var BACKLOG_STATUS_ORDEM = ["RESOLVIDO", "EM ANDAMENTO", "EM REFINAMENTO", "PENDENTE", "CANCELADO"];
+
+  function renderBacklogTab(doc) {
+    var html = '<div class="section-title" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">' +
+      'Backlog de Melhorias — Visão Executiva' +
+      '<button type="button" class="secondary" id="backlogUploadBtn" style="padding:6px 14px; font-size: var(--fs-xs);">' +
+      icoSpan("download") + ' ' + (doc ? "Atualizar planilha" : "Enviar planilha") + '</button></div>';
+
+    if (!doc) {
+      html += '<div class="card empty-state">' +
+        '<div class="big-icon">' + icoSpan("folder") + '</div>' +
+        '<div><strong>Nenhuma planilha de backlog carregada ainda</strong></div>' +
+        '<div class="hint">Envie a planilha “Produção Assistida - Sinistros” (aba “Homologação Assistida”) para ver a visão executiva.</div>' +
+        '<div id="backlogStatusMsg" class="status-msg" style="margin-top:12px;"></div>' +
+        '</div>';
+      return html;
+    }
+
+    var agg = doc.aggregates;
+    var uploadedDate = doc.uploadedAt ? new Date(doc.uploadedAt) : null;
+
+    html += '<p class="filter-explain" style="display:block; margin-top:-6px;">' +
+      (uploadedDate ? 'Planilha enviada em ' + uploadedDate.toLocaleString("pt-BR") + ' · ' : '') +
+      agg.total + ' itens analisados</p>';
+    html += '<div id="backlogStatusMsg" class="status-msg"></div>';
+
+    html += '<div class="kpi-grid">';
+    html += kpiCard("Total de itens no backlog", agg.total, null, null, false, ICONS.folder, "#2E86C1");
+    html += kpiCard("Taxa de atendimento (%)", agg.taxaAtendimento === null ? 0 : agg.taxaAtendimento, null, null, false, ICONS.checkCircle, COLORS.green,
+      "Percentual de itens RESOLVIDO sobre o total, excluídos os CANCELADO (que não contam nem como sucesso nem como pendência).");
+    html += kpiCard("Alto impacto ainda em aberto", agg.altoImpactoAbertos.length, null, true, false, ICONS.alertTriangle, COLORS.coral,
+      "Itens com Impacto = ALTA cujo status ainda é Pendente, Em Refinamento ou Em Andamento — o que mais merece atenção da gestão agora.");
+    html += kpiCard("Tempo médio de resolução (dias)", agg.tempoMedioResolucaoDias === null ? 0 : agg.tempoMedioResolucaoDias, null, true, true, ICONS.calendar, COLORS.maroon,
+      "Média de dias entre a Data do Registro e a Data da Correção, considerando apenas itens RESOLVIDO com as duas datas preenchidas.");
+    html += kpiCard("Cancelados", agg.porStatus["CANCELADO"] || 0, null, null, false, ICONS.close, COLORS.gray,
+      "Não entram no cálculo da taxa de atendimento — mostrados aqui só como referência.");
+    html += '</div>';
+
+    html += '<div class="chart-grid">';
+    html += '<div class="chart-card"><h3>Status dos itens</h3><div id="chart-backlog-status"></div></div>';
+    html += '<div class="chart-card"><h3>Onde se concentram os pedidos (Etapa do Fluxo)</h3><div id="chart-backlog-etapa"></div></div>';
+    html += '</div>';
+
+    // Tipo (BUG x MELHORIA) com taxa de resolucao de cada — leitura rapida de qual
+    // categoria esta mais em dia
+    html += '<div class="section-title">Bugs x Melhorias</div>';
+    html += '<div class="case-grid-2">';
+    ["BUG", "MELHORIA"].forEach(function (tipo) {
+      var t = agg.porTipo[tipo];
+      var pct = t && t.total ? Math.round((t.resolvido / t.total) * 100) : null;
+      html += '<div class="card case-metric">' +
+        '<div class="case-metric-title">' + (tipo === "BUG" ? "Bugs" : "Melhorias") + '</div>' +
+        '<div class="case-automacao-breakdown">' +
+        '<div class="case-mini-stat"><span class="n">' + fmt(t ? t.total : 0) + '</span><span class="l">Total</span></div>' +
+        '<div class="case-mini-stat"><span class="n">' + fmt(t ? t.resolvido : 0) + '</span><span class="l">Resolvidos</span></div>' +
+        '</div>' +
+        '<div class="case-metric-value">' + (pct === null ? "—" : pct + "%") + '</div>' +
+        '<div class="case-metric-meta">resolvido</div>' +
+        '</div>';
+    });
+    html += '</div>';
+
+    // itens de alto impacto ainda abertos — o que a gestao mais precisa ver, mais antigos primeiro
+    html += '<div class="section-title">Itens de alto impacto ainda em aberto' +
+      (agg.altoImpactoAbertos.length ? ' (' + agg.altoImpactoAbertos.length + ', mais antigos primeiro)' : '') + '</div>';
+    if (!agg.altoImpactoAbertos.length) {
+      html += '<div class="card" style="color:var(--color-fg-muted); font-size: var(--fs-sm);">' + icoSpan("checkCircle") + ' Nenhum item de alto impacto em aberto no momento.</div>';
+    } else {
+      html += '<div class="card detail-table-card"><div class="table-scroll"><table class="detail-table"><thead><tr>' +
+        '<th>ID</th><th>Etapa</th><th>Descrição</th><th>Status</th><th>Responsável</th><th>Dias em aberto</th>' +
+        '</tr></thead><tbody>';
+      var hoje = new Date();
+      agg.altoImpactoAbertos.forEach(function (it) {
+        // it.dataRegistro chega como objeto Date logo apos o upload (mesma sessao), mas como
+        // string ISO quando vem recarregado do banco — new Date(...) aceita os dois formatos
+        var regDate = it.dataRegistro ? new Date(it.dataRegistro) : null;
+        var dias = regDate ? Math.max(0, Math.round((hoje - regDate) / 86400000)) : null;
+        html += '<tr>' +
+          '<td>' + (it.id || "—") + '</td>' +
+          '<td>' + it.etapa + '</td>' +
+          '<td style="white-space:normal; min-width:260px; max-width:420px;">' + it.descricao + '</td>' +
+          '<td>' + it.status + '</td>' +
+          '<td>' + (it.responsavel || "—") + '</td>' +
+          '<td>' + (dias === null ? "—" : fmt(dias)) + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table></div></div>';
+    }
+
+    return html;
+  }
+
+  function wireBacklogTab() {
+    var btn = document.getElementById("backlogUploadBtn");
+    if (btn) btn.onclick = function () { backlogFileInput.click(); };
+    if (!backlogDoc) return;
+    var agg = backlogDoc.aggregates;
+
+    var statusEntries = BACKLOG_STATUS_ORDEM.filter(function (s) { return agg.porStatus[s]; }).map(function (s) {
+      return { label: s.charAt(0) + s.slice(1).toLowerCase(), value: agg.porStatus[s], color: BACKLOG_STATUS_COLOR[s] || COLORS.gray };
+    });
+    drawDonut("#chart-backlog-status", statusEntries, {});
+
+    var etapaEntries = Object.keys(agg.porEtapa).map(function (k) {
+      return { label: k, value: agg.porEtapa[k], color: "#2E86C1" };
+    }).sort(function (a, b) { return b.value - a.value; });
+    drawBars("#chart-backlog-etapa", etapaEntries, { horizontal: true });
+  }
+
   function kpiCard(label, curr, prev, invert, isDaysMetric, icon, iconColor, tooltip) {
     var hasVal = curr !== null && curr !== undefined;
     var displayVal = hasVal ? (isDaysMetric ? curr : fmt(curr)) : "—";
     return '<div class="kpi">' +
-      '<div class="kpi-icon" style="color:' + (iconColor || COLORS.navy) + ';">' + (icon || ICONS.barChart) + '</div>' +
+      '<div class="kpi-icon" style="color:' + (iconColor || "#2E86C1") + ';">' + (icon || ICONS.barChart) + '</div>' +
       '<div class="kpi-body">' +
       '<div class="label">' + label + (tooltip ? ' <span class="info-dot" data-tip="' + tooltip + '">?</span>' : '') + '</div>' +
       '<div class="value"' + (hasVal ? ' data-target="' + curr + '"' : '') + '>' + (hasVal ? "0" : displayVal) + '</div>' +
