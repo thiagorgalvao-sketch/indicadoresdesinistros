@@ -329,6 +329,19 @@
   .stale-banner .icon { font-size: var(--fs-xl); flex-shrink: 0; }
   .stale-banner strong { font-weight: 700; }
 
+  /* selo de prontidao do backlog (verde/amarelo/vermelho) — mesmo padrao do alert-banner
+     e do stale-banner: fundo pastel claro no tema claro, versao escura dedicada no escuro */
+  .readiness-banner { display: flex; align-items: center; gap: 12px; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; font-size: var(--fs-sm); font-weight: 700; }
+  .readiness-verde { background: var(--color-green-bg); border: 1px solid #A8D9BE; color: #1C6B45; }
+  .readiness-amarelo { background: var(--color-amber-bg); border: 1px solid #EBCFA0; color: #7A4E0E; }
+  .readiness-vermelho { background: var(--color-coral-bg); border: 1px solid #F2C6C0; color: #8A2E23; }
+  :root[data-theme="dark"] .readiness-verde { background: #1E3A2C; border-color: #2F5A42; color: #A8E0C0; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .readiness-verde { background: #1E3A2C; border-color: #2F5A42; color: #A8E0C0; } }
+  :root[data-theme="dark"] .readiness-amarelo { background: #3A3120; border-color: #5A4E30; color: #F0D9A8; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .readiness-amarelo { background: #3A3120; border-color: #5A4E30; color: #F0D9A8; } }
+  :root[data-theme="dark"] .readiness-vermelho { background: #3A2220; border-color: #5A3330; color: #F3B6AE; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .readiness-vermelho { background: #3A2220; border-color: #5A3330; color: #F3B6AE; } }
+
   .kpi-grid {
     display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; margin-bottom: 28px; align-items: stretch;
   }
@@ -1160,6 +1173,7 @@
   var sourceDoc = null; // upload mais recente com dados linha-a-linha (rowData), base de todo o corte por data
   var sourceDetail = null; // dados de detalhe (tabela de processos) correspondentes a sourceDoc, carregados a parte
   var backlogDoc = null; // ultimo upload da planilha de backlog de melhorias (Produção Assistida - Sinistros), independente do sourceDoc
+  var backlogHistory = []; // resumo leve (sem o array de items) dos ultimos envios do backlog, do mais antigo pro mais novo, pra tracar a evolucao
   var collapsedSections = { "Histórico de atualizações": true }; // guarda quais secoes o usuario fechou, pelo texto do titulo (sem contar botoes internos), pra persistir entre re-renders; Historico comeca recolhido por padrao
 
   // Agrupa tudo que vem depois de cada ".section-title" (ate o proximo) num wrapper
@@ -1492,6 +1506,10 @@
         var aggregates = computeBacklogAggregates(items);
         var payload = { uploadedAt: new Date().toISOString(), items: items, aggregates: aggregates };
         backlogDoc = payload;
+        backlogHistory = backlogHistory.concat([{
+          uploadedAt: payload.uploadedAt, total: aggregates.total,
+          taxaAtendimento: aggregates.taxaAtendimento, altoImpacto: aggregates.altoImpactoAbertos.length,
+        }]).slice(-10);
         renderDashboard();
         setBacklogStatus(items.length + " itens processados. Salvando…", "ok");
         // o banco so aceita JSON puro — datas de registro/correcao ficam como objetos Date
@@ -1727,10 +1745,17 @@
   // Agrega os itens numa visão gerencial: taxa de atendimento, onde se concentram os
   // pedidos, itens de alto impacto ainda abertos (o que mais importa pra gestão) e tempo
   // medio de resolução.
+  // metas ajustaveis da visao executiva — ainda nao combinadas com o negocio, usando
+  // valores de partida razoaveis pra Producao Assistida; troque aqui se quiser outro numero
+  var BACKLOG_META_ALTO_IMPACTO = 0; // meta: zero itens de alto impacto em aberto
+  var BACKLOG_META_TAXA_ATENDIMENTO = 80; // meta: 80% de taxa de atendimento
+  var BACKLOG_PESO_IMPACTO = { "ALTA": 3, "MÉDIA": 2, "BAIXA": 1 };
+
   function computeBacklogAggregates(items) {
     var total = items.length;
     var porStatus = {};
     var porEtapa = {};
+    var porResponsavel = {}; // so itens em aberto — "quem esta segurando", nao historico
     var porTipo = {}; // {tipo: {total, resolvido}}
     var somaDiasResolucao = 0, countResolvidosComDatas = 0;
     var altoImpactoAbertos = [];
@@ -1747,6 +1772,10 @@
           if (dias >= 0) { somaDiasResolucao += dias; countResolvidosComDatas++; }
         }
       }
+      if (BACKLOG_STATUS_ABERTOS.indexOf(it.status) !== -1) {
+        var resp = it.responsavel || "Não informado";
+        porResponsavel[resp] = (porResponsavel[resp] || 0) + 1;
+      }
       if (it.impacto === "ALTA" && BACKLOG_STATUS_ABERTOS.indexOf(it.status) !== -1) {
         altoImpactoAbertos.push(it);
       }
@@ -1761,15 +1790,22 @@
     var resolvidos = porStatus["RESOLVIDO"] || 0;
     var cancelados = porStatus["CANCELADO"] || 0;
     var baseTaxa = total - cancelados; // cancelado nao conta nem como sucesso nem como pendencia
+    var taxaAtendimento = baseTaxa > 0 ? Math.round((resolvidos / baseTaxa) * 100) : null;
+
+    // selo de prontidao: resume numa cor so se a operacao ainda carrega risco alto em
+    // aberto — pensado pra decidir se da pra sair da Producao Assistida
+    var readiness = altoImpactoAbertos.length === 0 ? "verde" : (altoImpactoAbertos.length <= 5 ? "amarelo" : "vermelho");
 
     return {
       total: total,
       porStatus: porStatus,
       porEtapa: porEtapa,
+      porResponsavel: porResponsavel,
       porTipo: porTipo,
-      taxaAtendimento: baseTaxa > 0 ? Math.round((resolvidos / baseTaxa) * 100) : null,
+      taxaAtendimento: taxaAtendimento,
       tempoMedioResolucaoDias: countResolvidosComDatas > 0 ? Math.round(somaDiasResolucao / countResolvidosComDatas) : null,
       altoImpactoAbertos: altoImpactoAbertos,
+      readiness: readiness,
     };
   }
 
@@ -2074,17 +2110,54 @@
       '</div>';
   }
 
+  // Recalcula os agregados do zero a partir dos itens brutos de um doc de backlog
+  // carregado do banco. Isso protege contra snapshots salvos ANTES de um campo novo ter
+  // sido adicionado em computeBacklogAggregates (ex.: readiness e porResponsavel nao
+  // existiam nos envios salvos antes dessa funcionalidade — sem isso, acessar esses campos
+  // faltantes lança um erro no meio da montagem do HTML da aba, e como isso acontece antes
+  // de content.innerHTML ser atribuido, a aba simplesmente nao troca, ficando presa na
+  // ultima aba renderizada). Tambem reconverte as datas de string ISO (formato salvo no
+  // banco) de volta pra objeto Date (formato que os calculos de dias precisam).
+  function rehydrateBacklogDoc(doc) {
+    if (!doc || !Array.isArray(doc.items)) return doc;
+    var items = doc.items.map(function (it) {
+      return Object.assign({}, it, {
+        dataRegistro: it.dataRegistro ? new Date(it.dataRegistro) : null,
+        dataCorrecao: it.dataCorrecao ? new Date(it.dataCorrecao) : null,
+      });
+    });
+    return { uploadedAt: doc.uploadedAt, items: items, aggregates: computeBacklogAggregates(items) };
+  }
+
   function loadAndRender(db) {
     currentDb = db;
     showSkeleton();
     // backlog de melhorias é independente do fluxo principal de indicadores — busca em
     // paralelo, sem bloquear o carregamento do resto do painel
     db.collection("backlog_snapshots").orderBy("uploadedAt", "desc").limit(1).get().then(function (backSnap) {
-      backlogDoc = backSnap.docs.length ? backSnap.docs[0].data() : null;
+      backlogDoc = rehydrateBacklogDoc(backSnap.docs.length ? backSnap.docs[0].data() : null);
       if (activeTab === "backlog") renderDashboard();
     }).catch(function (err) {
       console.error("[backlog] erro ao buscar a colecao backlog_snapshots:", err);
       backlogDoc = null;
+    });
+    // historico leve pra tracar evolucao (item #1 da visao executiva) — busca so os
+    // agregados de cada envio anterior, nao o array de items inteiro de cada um
+    db.collection("backlog_snapshots").orderBy("uploadedAt", "desc").limit(10).get().then(function (histSnap) {
+      backlogHistory = histSnap.docs.map(function (d) {
+        var data = d.data();
+        var a = data.aggregates || {};
+        return {
+          uploadedAt: data.uploadedAt,
+          total: a.total || 0,
+          taxaAtendimento: a.taxaAtendimento === undefined ? null : a.taxaAtendimento,
+          altoImpacto: (a.altoImpactoAbertos || []).length,
+        };
+      }).reverse(); // mais antigo primeiro, pra tracar da esquerda pra direita
+      if (activeTab === "backlog") renderDashboard();
+    }).catch(function (err) {
+      console.error("[backlog] erro ao buscar historico:", err);
+      backlogHistory = [];
     });
     db.collection("snapshots").orderBy("uploadedAt", "desc").limit(20).get().then(function (snap) {
       processBtn.disabled = !pendingRows;
@@ -2386,12 +2459,19 @@
       filterExplain.style.display = "none";
       sourceBadge.style.display = "none";
       periodBar.style.display = "none";
-      content.innerHTML = renderBacklogTab(backlogDoc);
-      content.classList.remove("content-fade-in");
-      void content.offsetWidth;
-      content.classList.add("content-fade-in");
-      animateCounters();
-      wireBacklogTab();
+      try {
+        content.innerHTML = renderBacklogTab(backlogDoc);
+        content.classList.remove("content-fade-in");
+        void content.offsetWidth;
+        content.classList.add("content-fade-in");
+        animateCounters();
+        wireBacklogTab();
+      } catch (err) {
+        // se algo quebrar na montagem dessa aba, mostra o erro em vez de deixar a tela
+        // presa no conteudo da aba anterior (silenciosamente, sem nenhum aviso)
+        console.error("[backlog] erro ao renderizar a aba:", err);
+        content.innerHTML = '<div class="card" style="color:var(--color-coral);">' + icoSpan("alertTriangle") + ' Erro ao montar a visão de Backlog: ' + (err && err.message ? err.message : err) + '</div>';
+      }
       return;
     }
 
@@ -2988,16 +3068,46 @@
       agg.total + ' itens analisados</p>';
     html += '<div id="backlogStatusMsg" class="status-msg"></div>';
 
+    // selo de prontidao — resume numa cor so se ainda ha risco alto em aberto; os limites
+    // (0 / 1-5 / 6+) sao um ponto de partida, ajuste BACKLOG_META_ALTO_IMPACTO e a logica
+    // de readiness em computeBacklogAggregates se quiser outro criterio
+    var READINESS_INFO = {
+      verde: { icon: "checkCircle", text: "Pronto — nenhum item de alto impacto em aberto." },
+      amarelo: { icon: "alertTriangle", text: "Atenção — " + agg.altoImpactoAbertos.length + " item(ns) de alto impacto ainda em aberto." },
+      vermelho: { icon: "alertTriangle", text: "Risco alto — " + agg.altoImpactoAbertos.length + " itens de alto impacto ainda em aberto." },
+    };
+    var rd = READINESS_INFO[agg.readiness];
+    html += '<div class="readiness-banner readiness-' + agg.readiness + '">' + icoSpan(rd.icon) + ' ' + rd.text + '</div>';
+
+    var taxaMeta = agg.taxaAtendimento === null ? null : {
+      kind: agg.taxaAtendimento >= BACKLOG_META_TAXA_ATENDIMENTO ? "good" : "bad",
+      text: (agg.taxaAtendimento >= BACKLOG_META_TAXA_ATENDIMENTO ? "✓ " : "") + "meta: " + BACKLOG_META_TAXA_ATENDIMENTO + "%",
+    };
+    var altoImpactoMeta = {
+      kind: agg.altoImpactoAbertos.length <= BACKLOG_META_ALTO_IMPACTO ? "good" : "bad",
+      text: (agg.altoImpactoAbertos.length <= BACKLOG_META_ALTO_IMPACTO ? "✓ " : "") + "meta: " + BACKLOG_META_ALTO_IMPACTO,
+    };
+
     html += '<div class="kpi-grid">';
     html += statKpiCard("Total de itens", agg.total, ICONS.folder, "#2E86C1");
     html += statKpiCard("Taxa de atendimento (%)", agg.taxaAtendimento === null ? 0 : agg.taxaAtendimento, ICONS.checkCircle, COLORS.green,
-      "Percentual de itens RESOLVIDO sobre o total, excluídos os CANCELADO (que não contam nem como sucesso nem como pendência).");
+      "Percentual de itens RESOLVIDO sobre o total, excluídos os CANCELADO (que não contam nem como sucesso nem como pendência).", taxaMeta);
     html += statKpiCard("Alto impacto em aberto", agg.altoImpactoAbertos.length, ICONS.alertTriangle, COLORS.coral,
-      "Itens com Impacto = ALTA cujo status ainda é Pendente, Em Refinamento ou Em Andamento — o que mais merece atenção da gestão agora.");
+      "Itens com Impacto = ALTA cujo status ainda é Pendente, Em Refinamento ou Em Andamento — o que mais merece atenção da gestão agora.", altoImpactoMeta);
     html += statKpiCard("Dias p/ resolver (média)", agg.tempoMedioResolucaoDias === null ? 0 : agg.tempoMedioResolucaoDias, ICONS.calendar, COLORS.maroon,
       "Média de dias entre a Data do Registro e a Data da Correção, considerando apenas itens RESOLVIDO com as duas datas preenchidas.");
     html += statKpiCard("Cancelados", agg.porStatus["CANCELADO"] || 0, ICONS.close, COLORS.gray,
       "Não entram no cálculo da taxa de atendimento — mostrados aqui só como referência.");
+    html += '</div>';
+
+    // evolucao ao longo dos envios — a pergunta estrategica ("estamos melhorando?"), nao
+    // so a fotografia do envio mais recente
+    html += '<div class="chart-card" style="margin-bottom:20px;"><h3>Evolução do backlog (por envio de planilha)</h3>';
+    if (backlogHistory.length < 2) {
+      html += '<div style="color:var(--color-fg-muted); font-size: var(--fs-sm); padding:8px 0;">Precisa de pelo menos 2 envios da planilha pra traçar a evolução — continue enviando a cada atualização que o gráfico aparece aqui.</div>';
+    } else {
+      html += '<div id="chart-backlog-trend"></div>';
+    }
     html += '</div>';
 
     html += '<div class="chart-grid">';
@@ -3022,6 +3132,17 @@
         '<div class="case-metric-meta">resolvido</div>' +
         '</div>';
     });
+    html += '</div>';
+
+    // quem esta com os itens em aberto — mais acionavel pra gestao do que so a etapa
+    // tecnica, porque aponta direto com quem cobrar
+    var respEntries = Object.keys(agg.porResponsavel);
+    html += '<div class="chart-card" style="margin-bottom:20px;"><h3>Quem está com os itens em aberto</h3>';
+    if (!respEntries.length) {
+      html += '<div style="color:var(--color-fg-muted); font-size: var(--fs-sm); padding:8px 0;">Nenhum item em aberto no momento.</div>';
+    } else {
+      html += '<div id="chart-backlog-responsavel"></div>';
+    }
     html += '</div>';
 
     // itens de alto impacto ainda abertos — o que a gestao mais precisa ver, mais antigos primeiro
@@ -3051,6 +3172,37 @@
       html += '</tbody></table></div></div>';
     }
 
+    // exposicao ao risco: olha TODOS os itens em aberto (nao so os de impacto ALTA),
+    // ponderando dias em aberto pelo peso do impacto — pode trazer a tona um item de
+    // impacto MEDIA que ninguem tratou ha muito tempo e que a tabela acima nao mostra
+    var exposicao = (doc.items || []).filter(function (it) {
+      return BACKLOG_STATUS_ABERTOS.indexOf(it.status) !== -1;
+    }).map(function (it) {
+      var regDate = it.dataRegistro ? new Date(it.dataRegistro) : null;
+      var dias = regDate ? Math.max(0, Math.round((new Date() - regDate) / 86400000)) : 0;
+      var peso = BACKLOG_PESO_IMPACTO[it.impacto] || 1;
+      return { it: it, dias: dias, score: dias * peso };
+    }).sort(function (a, b) { return b.score - a.score; }).slice(0, 5);
+
+    html += '<div class="section-title">Maior exposição ao risco (dias em aberto × peso do impacto)</div>';
+    if (!exposicao.length) {
+      html += '<div class="card" style="color:var(--color-fg-muted); font-size: var(--fs-sm);">' + icoSpan("checkCircle") + ' Nenhum item em aberto no momento.</div>';
+    } else {
+      html += '<div class="card detail-table-card"><div class="table-scroll"><table class="detail-table"><thead><tr>' +
+        '<th>ID</th><th>Impacto</th><th>Dias em aberto</th><th>Pontuação</th><th>Descrição</th>' +
+        '</tr></thead><tbody>';
+      exposicao.forEach(function (e) {
+        html += '<tr>' +
+          '<td>' + (e.it.id || "—") + '</td>' +
+          '<td>' + e.it.impacto + '</td>' +
+          '<td>' + fmt(e.dias) + '</td>' +
+          '<td><strong>' + fmt(e.score) + '</strong></td>' +
+          '<td style="white-space:normal; min-width:260px; max-width:420px;">' + e.it.descricao + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table></div></div>';
+    }
+
     return html;
   }
 
@@ -3069,16 +3221,83 @@
       return { label: k, value: agg.porEtapa[k], color: "#2E86C1" };
     }).sort(function (a, b) { return b.value - a.value; });
     drawBars("#chart-backlog-etapa", etapaEntries, { horizontal: true });
+
+    var respEntries = Object.keys(agg.porResponsavel).map(function (k) {
+      return { label: k, value: agg.porResponsavel[k], color: "#2E86C1" };
+    }).sort(function (a, b) { return b.value - a.value; });
+    if (respEntries.length) drawBars("#chart-backlog-responsavel", respEntries, { horizontal: true });
+
+    if (backlogHistory.length >= 2) drawBacklogTrend("#chart-backlog-trend", backlogHistory);
+  }
+
+  // grafico simples de evolucao do backlog entre envios — linha de "alto impacto em
+  // aberto" (a metrica mais estrategica: esta melhorando ou piorando) com a taxa de
+  // atendimento de cada ponto anotada embaixo do eixo
+  function drawBacklogTrend(sel, history) {
+    var container = d3.select(sel);
+    container.selectAll("*").remove();
+    var W = chartWidth(sel);
+    var H = 220;
+    var margin = { top: 16, right: 16, bottom: 36, left: 34 };
+    var innerW = W - margin.left - margin.right;
+    var innerH = H - margin.top - margin.bottom;
+
+    var svg = container.append("svg").attr("viewBox", "0 0 " + W + " " + H);
+    addSrTitle(svg, "Evolução de itens de alto impacto em aberto em " + history.length + " envios da planilha de backlog.");
+    var g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    var x = d3.scalePoint().domain(history.map(function (d, i) { return String(i); })).range([0, innerW]).padding(0.5);
+    var maxY = d3.max(history, function (d) { return d.altoImpacto; }) || 1;
+    var y = d3.scaleLinear().domain([0, Math.max(maxY * 1.3, 1)]).range([innerH, 0]);
+
+    var yAxisG = g.append("g").call(d3.axisLeft(y).ticks(4).tickSize(-innerW));
+    yAxisG.select(".domain").remove();
+    yAxisG.selectAll("line").attr("stroke", "var(--color-border-line)").attr("stroke-dasharray", "2,3");
+    yAxisG.selectAll("text").attr("class", "axis-label");
+
+    var line = d3.line()
+      .x(function (d, i) { return x(String(i)); })
+      .y(function (d) { return y(d.altoImpacto); })
+      .curve(d3.curveMonotoneX);
+    g.append("path").datum(history).attr("fill", "none").attr("stroke", COLORS.coral).attr("stroke-width", 2.5).attr("d", line);
+
+    g.selectAll(".pt").data(history).enter().append("circle")
+      .attr("cx", function (d, i) { return x(String(i)); })
+      .attr("cy", function (d) { return y(d.altoImpacto); })
+      .attr("r", 4).attr("fill", COLORS.coral).attr("stroke", "var(--color-panel)").attr("stroke-width", 2)
+      .append("title").text(function (d) {
+        var dt = d.uploadedAt ? new Date(d.uploadedAt).toLocaleDateString("pt-BR") : "";
+        return dt + ": " + d.altoImpacto + " de alto impacto em aberto · " + (d.taxaAtendimento === null ? "—" : d.taxaAtendimento + "%") + " de atendimento";
+      });
+
+    g.selectAll(".val").data(history).enter().append("text")
+      .attr("x", function (d, i) { return x(String(i)); })
+      .attr("y", function (d) { return y(d.altoImpacto) - 10; })
+      .attr("text-anchor", "middle").attr("class", "axis-label")
+      .style("font-weight", "700")
+      .text(function (d) { return d.altoImpacto; });
+
+    // eixo x: data de cada envio (curta) embaixo, e a taxa de atendimento daquele ponto
+    // numa segunda linha, pra nao precisar de um segundo eixo so pra essa referencia
+    var xAxisG = g.append("g").attr("transform", "translate(0," + innerH + ")");
+    history.forEach(function (d, i) {
+      var dt = d.uploadedAt ? new Date(d.uploadedAt) : null;
+      var label = dt ? (dt.getDate() + "/" + (dt.getMonth() + 1)) : "—";
+      xAxisG.append("text").attr("x", x(String(i))).attr("y", 16).attr("text-anchor", "middle").attr("class", "axis-cat").text(label);
+      xAxisG.append("text").attr("x", x(String(i))).attr("y", 30).attr("text-anchor", "middle").attr("class", "axis-label")
+        .style("fill", COLORS.green).text(d.taxaAtendimento === null ? "" : d.taxaAtendimento + "%");
+    });
   }
 
   // KPI simples, sem linha de delta/comparativo — usado em abas que nao tem um "periodo
   // anterior" pra comparar (ex.: Backlog, que e so a leitura de UM upload de planilha)
-  function statKpiCard(label, value, icon, iconColor, tooltip) {
+  function statKpiCard(label, value, icon, iconColor, tooltip, metaLine) {
     return '<div class="kpi">' +
       '<div class="kpi-icon" style="color:' + (iconColor || "#2E86C1") + ';">' + (icon || ICONS.barChart) + '</div>' +
       '<div class="kpi-body">' +
       '<div class="label">' + label + (tooltip ? ' <span class="info-dot" data-tip="' + tooltip + '">?</span>' : '') + '</div>' +
       '<div class="value" data-target="' + value + '">0</div>' +
+      (metaLine ? '<div class="delta ' + metaLine.kind + '">' + metaLine.text + '</div>' : '') +
       '</div>' +
       '</div>';
   }
