@@ -2001,10 +2001,15 @@
       var analistaRaw = norm(r["Analista Responsável"]);
       var analistaIdx = analystIdxFor(analistaRaw || ANALISTA_NAO_INFORMADO);
 
-      var liquidacaoRaw = r["Data da liquidação"];
+      // Data de encerramento do processo (posicao 4 do rowData). A exportacao atual da
+      // Lecom ainda nao traz essa coluna; aceitamos os nomes mais provaveis e, como
+      // alternativa, a "Data da liquidação" que existia em exportacoes antigas.
+      var encerramentoRaw = r["Data de encerramento"] || r["Data do encerramento"] || r["Data de Encerramento"] ||
+        r["Data de conclusão"] || r["Data da conclusão"] || r["Data de fechamento"] ||
+        r["Data de finalização"] || r["Data de término"] || r["Data da liquidação"];
       var liqDays = null;
-      if (liquidacaoRaw) {
-        var dl = new Date(liquidacaoRaw);
+      if (encerramentoRaw) {
+        var dl = new Date(encerramentoRaw);
         if (!isNaN(dl.getTime())) liqDays = daysSinceEpoch(dl);
       }
 
@@ -2382,28 +2387,24 @@
     return { api: api, manual: manual, base: base, pct: base > 0 ? Math.round((api / base) * 100) : null };
   }
 
-  // Calcula o SLA medio (Abertura -> Pagamento) dentro do intervalo informado. Enquanto
-  // nao houver nenhuma data de pagamento preenchida no intervalo, usa um PROXY
-  // provisorio: tempo medio em aberto (abertura -> hoje/data de corte) para os mesmos
-  // processos. Assim que existir ao menos 1 pagamento real no intervalo, passa a usar
-  // sempre o calculo real (Abertura -> Pagamento).
-  function computeSla(rowData, rangeStartDays, rangeEndDays, todayDays) {
+  // SLA do sinistro = tempo de vida do processo, da Abertura ao Encerramento, SO de
+  // processos ja concluidos (status Aprovado ou Rejeitado) que tenham data de encerramento
+  // (posicao 4 do rowData). Cancelados ficam fora: cancelar e descartar um registro
+  // (erro de cadastro/duplicidade), nao concluir um sinistro. Processos em aberto nunca
+  // entram. O periodo considera a data de Abertura, como o resto do painel.
+  function computeSla(rowData, rangeStartDays, rangeEndDays) {
     if (!rowData) return null;
-    var somaReal = 0, countReal = 0;
-    var somaProxy = 0, countProxy = 0;
+    var soma = 0, count = 0, concluidos = 0, semData = 0;
     rowData.forEach(function (row) {
-      var abDays = row[0], pagDays = row[6];
+      var abDays = row[0], statusCode = row[1], encDays = row.length > 4 ? row[4] : null;
       if (abDays < rangeStartDays || abDays > rangeEndDays) return;
-      countProxy++;
-      somaProxy += (todayDays - abDays);
-      if (pagDays !== undefined && pagDays !== null) {
-        var dias = pagDays - abDays;
-        if (dias >= 0) { somaReal += dias; countReal++; }
-      }
+      if (statusCode !== 0 && statusCode !== 4) return;
+      concluidos++;
+      if (encDays === null || encDays === undefined) { semData++; return; }
+      var dias = encDays - abDays;
+      if (dias >= 0) { soma += dias; count++; }
     });
-    if (countReal > 0) return { mode: "real", count: countReal, avgDays: Math.round(somaReal / countReal) };
-    if (countProxy > 0) return { mode: "proxy", count: countProxy, avgDays: Math.round(somaProxy / countProxy) };
-    return null;
+    return { count: count, concluidos: concluidos, semData: semData, avgDays: count ? Math.round(soma / count) : null };
   }
 
   // Filtra rowData pelo modo de período escolhido (compartilhado entre as duas abas):
@@ -2482,26 +2483,26 @@
     html += caseMetricCard("Redução de custo da área", "-29,03%", null,
       "Precisa de headcount e salário bruto por cargo (RH).");
 
-    // 3) SLA Abertura -> Pagamento — real quando houver pagamentos; proxy (tempo em
-    // aberto) enquanto não houver nenhum
-    var slaCalc = computeSla(effectiveRowData, rangeStart, rangeEnd, cutDays);
-    if (slaCalc && slaCalc.mode === "real") {
+    // 3) SLA Abertura -> Encerramento — tempo de vida medio so dos processos concluidos
+    // (Aprovado/Rejeitado) com data de encerramento; ver computeSla
+    var slaCalc = computeSla(effectiveRowData, rangeStart, rangeEnd);
+    if (slaCalc && slaCalc.count > 0) {
       html += '<div class="card case-metric">' +
-        '<div class="case-metric-title">SLA do sinistro (Abertura → Pagamento)</div>' +
+        '<div class="case-metric-title">SLA do sinistro (Abertura → Encerramento)</div>' +
         '<div class="case-metric-meta">Meta: Redução do tempo total · ' + periodoTxt + '</div>' +
         '<div class="case-metric-value">' + slaCalc.avgDays + ' dias</div>' +
-        '<div class="case-sub">Média sobre ' + fmt(slaCalc.count) + ' processos já pagos no período</div>' +
+        '<div class="case-sub">Tempo médio de vida de ' + fmt(slaCalc.count) + ' processos concluídos (aprovados e rejeitados; cancelados ficam fora)' +
+        (slaCalc.semData ? ' · ' + fmt(slaCalc.semData) + ' concluídos sem data de encerramento não entram' : '') + '</div>' +
         '</div>';
-    } else if (slaCalc && slaCalc.mode === "proxy") {
+    } else if (slaCalc && slaCalc.concluidos > 0) {
       html += '<div class="card case-metric">' +
-        '<div class="case-metric-title">SLA do sinistro (Abertura → Pagamento)</div>' +
+        '<div class="case-metric-title">SLA do sinistro (Abertura → Encerramento)</div>' +
         '<div class="case-metric-meta">Meta: Redução do tempo total · ' + periodoTxt + '</div>' +
-        '<div class="case-metric-value">' + slaCalc.avgDays + ' dias</div>' +
-        '<div class="case-sub">' + icoSpan("alertTriangle") + ' Proxy provisório: ainda sem nenhuma data de pagamento preenchida — mostrando o tempo médio em aberto (abertura até hoje) de ' + fmt(slaCalc.count) + ' processos. Assim que houver pagamentos registrados, passa a usar o cálculo real.</div>' +
+        '<div class="case-sub">' + icoSpan("alertTriangle") + ' Há ' + fmt(slaCalc.concluidos) + ' processos concluídos no período, mas a planilha exportada da Lecom não traz a data de encerramento. Inclua a coluna “Data de encerramento” na exportação para o cálculo aparecer.</div>' +
         '</div>';
     } else {
-      html += caseMetricCard("SLA do sinistro (Abertura → Pagamento)", "Redução do tempo total", null,
-        "Nenhum processo encontrado " + periodoTxt + " no período selecionado para calcular.");
+      html += caseMetricCard("SLA do sinistro (Abertura → Encerramento)", "Redução do tempo total", null,
+        "Nenhum processo concluído " + periodoTxt + " no período selecionado.");
     }
 
     // 4) NPS — bloqueado (pesquisa externa)
